@@ -26,7 +26,7 @@ Supported messengers: **Telegram** (via Telethon) · **VK.com** (via vk_api)
 ## Local Setup
 
 ```bash
-git clone https://github.com/your-org/synchromessotron.git
+git clone https://github.com/vsirotin/synchromessotron.git
 cd synchromessotron
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
