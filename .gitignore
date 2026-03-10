@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+.env
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Ruff / Black
+.ruff_cache/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
+pubsub-debug.log
+
+# Telethon sessions (contain auth tokens — never commit)
+*.session
+*.session-journal
+
+# Secrets / credentials
+*.env
+.env.*
+secrets/
+
+# Service configuration (contains account IDs — do not commit)
+config.yaml
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/settings.json
+.idea/

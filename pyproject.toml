@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "synchromessotron"
+version = "0.1.0"
+description = "Firebase-hosted cron service that synchronizes messages between messenger accounts."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+    "firebase-admin>=6.5",
+    "pydantic>=2.6",
+    "PyYAML>=6.0",
+    # Messenger libraries — confirmed at Checkpoint 1
+    "Telethon>=1.36",
+    "vk_api>=11.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.1",
+    "pytest-asyncio>=0.23",
+    "pytest-mock>=3.12",
+    "ruff>=0.4",
+    "black>=24.3",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*", "functions*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["src", "functions"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
