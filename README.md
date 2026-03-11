@@ -245,55 +245,58 @@ If both commands succeed, your Telegram credentials are fully working. Note the 
 
 ### Step 6 — Get Your VK.com Credentials
 
-The service authenticates as your VK **user account** using an access token. You need to create a VK application to obtain one.
+The service authenticates as your VK **user account** using an access token. The repo includes a helper script `tools/vk_auth.py` that logs in with your VK phone/email and password and prints a token — no app registration needed.
 
-#### 6a. Create a VK standalone application
+> **Why no app?** VK no longer grants the `messages` permission to tokens obtained via browser OAuth from newly created apps. The helper script uses `vk_api`'s built-in mobile login flow which does have messages access.
 
-1. Go to <https://vk.com/editapp?act=create> (you must be logged in to VK).
-2. Enter a title (e.g. `Synchromessotron`), choose **Standalone application**, and click **Connect application**.
-3. Confirm via SMS if prompted.
-4. You will see your application settings page. Note the **Application ID** (a number).
+#### 6a. Generate a VK access token
 
-> Save your screenshot here: [docs/images/vk-01-create-app.png](docs/images/vk-01-create-app.png)
-
-#### 6b. Obtain an access token via OAuth
-
-Open the following URL in your browser, replacing `YOUR_APP_ID` with your Application ID:
-
-```
-https://oauth.vk.com/authorize?client_id=YOUR_APP_ID&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=messages&response_type=token&v=5.199
+```bash
+source .venv/bin/activate
+python3 tools/vk_auth.py token
 ```
 
-VK will ask you to authorise the application. After you click **Allow**, the browser redirects to a blank page. The access token is in the URL bar — it looks like:
+The script will prompt for your VK login (phone number or email) and password. If you have 2FA or a captcha, it will ask for those too.
 
-```
-https://oauth.vk.com/blank.html#access_token=LONG_TOKEN_HERE&expires_in=0&user_id=123456789
-```
+When it succeeds it prints:
+- Your access token (a long string)
+- The ready-to-copy `export VK_CREDS=...` command
 
-Copy the value after `access_token=` (up to, but not including, `&expires_in`).
+Copy the token — **treat it like a password**.
 
-> Save your screenshot here: [docs/images/vk-02-oauth-token.png](docs/images/vk-02-oauth-token.png)
-
-You will also need your VK **user_id** — it is visible in the URL above as `user_id=123456789`.
-
-#### 6c. Build the credential JSON
+#### 6b. Build the credential JSON
 
 ```bash
 export VK_CREDS='{"token": "your_vk_access_token_here"}'
 ```
 
-#### 6d. Find the VK peer_id for the conversation to sync
+Replace `your_vk_access_token_here` with the token printed by the script above.
 
-`peer_id` identifies which VK conversation to read from or write to.
+#### 6c. List your conversations and find the peer_id
 
-| Conversation type | peer_id |
-|---|---|
-| Direct message with a user | That user's VK numeric ID |
-| Multi-chat (group conversation) | `2000000000 + chat_id` |
+```bash
+python3 tools/vk_auth.py list
+```
 
-The easiest way to find a user's numeric ID: open their VK profile in a browser. The URL will be either `vk.com/id123456789` (the number is their ID) or a custom URL like `vk.com/username` — in that case, right-click their avatar, copy the image URL, and find the numeric ID there. Alternatively, paste their profile URL into <https://vk.com/dev/get_user_id>.
+Example output:
 
-For a quick local test you can sync messages to your own account: use the `user_id` shown in the OAuth redirect URL above.
+```
+  TYPE         PEER_ID          NAME
+  ------------ ---------------- ---------------------------------------------
+  User         123456789        Ivan Ivanov
+  Chat         2000000001       Family Group
+  User         555000           VK
+```
+
+Note the **PEER_ID** of the conversation you want to sync — you will need it in Step 7.
+
+#### 6d. Verify read and write access to your chosen conversation
+
+```bash
+python3 tools/vk_auth.py test 123456789
+```
+
+Replace `123456789` with your actual peer_id. The tool will print the last 3 messages and optionally send a test message, just like `tg_check.py test` does for Telegram.
 
 ---
 
