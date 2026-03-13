@@ -48,3 +48,4 @@ config.yaml
 # IDE
 .vscode/settings.json
 .idea/
+README copy.md
