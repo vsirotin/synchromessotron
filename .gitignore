@@ -49,3 +49,8 @@ config.yaml
 .vscode/settings.json
 .idea/
 README copy.md
+
+# Service diretories and files
+TMP/ 
+.github/agents/lang-tutor.agent.md
+.github/hooks/log-prompts.json

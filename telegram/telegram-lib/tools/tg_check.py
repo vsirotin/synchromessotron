@@ -2,19 +2,21 @@
 """
 Telegram setup helper for Synchromessotron.
 
+Reads credentials from the .env.telegram file (not environment variables).
+
 Commands:
 
   python3 tools/tg_check.py list
 
       Lists your 50 most recent Telegram dialogs with their numeric IDs.
       Use this to find the ID of the group or chat you want to sync.
-      Requires the TG_CREDS environment variable.
 
   python3 tools/tg_check.py test <dialog_id>
 
       Shows the last 3 messages from the given dialog and lets you send
       a test message to confirm write access works.
-      Requires the TG_CREDS environment variable.
+      ⚠️  WARNING: sending a test message will post a REAL message
+      visible to all members of the dialog.
 
 Examples:
 
@@ -24,26 +26,49 @@ Examples:
 """
 
 import asyncio
-import json
-import os
 import sys
+from pathlib import Path
 
+from dotenv import dotenv_values
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
 
+def _find_env_file() -> Path:
+    """Look for .env.telegram in the script's parent directory or cwd."""
+    candidates = [
+        Path(__file__).resolve().parent.parent / ".env.telegram",
+        Path.cwd() / ".env.telegram",
+    ]
+    for p in candidates:
+        if p.exists():
+            return p
+    sys.exit(
+        "Error: .env.telegram not found.\n"
+        "Copy .env.telegram.example to .env.telegram and fill in your values:\n"
+        "  cp .env.telegram.example .env.telegram"
+    )
+
+
 def _load_creds() -> dict:
-    raw = os.environ.get("TG_CREDS")
-    if not raw:
+    env_path = _find_env_file()
+    env = dotenv_values(env_path)
+
+    api_id = env.get("TG_API_ID", "").strip()
+    api_hash = env.get("TG_API_HASH", "").strip()
+    session = env.get("TG_SESSION", "").strip()
+
+    if not api_id or api_id == "12345":
+        sys.exit("Error: TG_API_ID in .env.telegram is not set or still has the example value.")
+    if not api_hash or api_hash == "your_api_hash_here":
+        sys.exit("Error: TG_API_HASH in .env.telegram is not set or still has the example value.")
+    if not session:
         sys.exit(
-            "Error: TG_CREDS environment variable is not set.\n"
-            "Set it with: export TG_CREDS='"
-            '{"api_id": 12345, "api_hash": "...", "session": "..."}\''
+            "Error: TG_SESSION in .env.telegram is empty.\n"
+            "Run 'python3 tools/generate_session.py' first to generate a session string."
         )
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError as e:
-        sys.exit(f"Error: TG_CREDS is not valid JSON: {e}")
+
+    return {"api_id": int(api_id), "api_hash": api_hash, "session": session}
 
 
 def _make_client(creds: dict) -> TelegramClient:
