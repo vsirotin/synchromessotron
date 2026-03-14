@@ -41,12 +41,12 @@ You should see all tests pass. If any fail, check that dependencies installed co
 2. Click **API development tools**.
 3. Fill in the **Create new application** form. The App title and Short name can be anything, e.g. `synchromessotron` / `syncbot`. Platform can be left as `Other`.
 
-   ![Create new application dialog](../../docs/images/telegram1.png)
+   ![Create new application dialog](docs/images/telegram1.png)
 
 4. Click **Create application**.
 5. You will see your **App api_id** (a number) and **App api_hash** (a long hex string). Note both values — you will need them in the next step.
 
-   ![api_id and api_hash](../../docs/images/telegram2.png)
+   ![api_id and api_hash](docs/images/telegram2.png)
 
 ### Step 4 — Create the secure environment file
 
@@ -94,9 +94,9 @@ TG_SESSION=your_generated_session_string_here
 
 **Treat the session string like a password.**
 
-### Step 6 — List your dialogs
+### Step 6 — List your chats
 
-Run the dialog listing tool to confirm your credentials work and see all your Telegram dialogs with their numeric IDs:
+Run the chat listing tool to confirm your credentials work and see all your Telegram chats with their numeric IDs:
 
 ```bash
 python3 tools/tg_check.py list
@@ -120,84 +120,22 @@ Example output:
 | `Chat`    | A regular group chat                                |
 | `User`    | A direct message conversation with a person         |
 
-Note the **ID** of the dialog you want to test — including the minus sign for groups and channels.
+Note the **ID** of the chat you want to test — including the minus sign for groups and channels.
 
 ### Step 7 — Verify read and write access
 
 ```bash
-python3 tools/tg_check.py test <dialog_id>
+python3 tools/tg_check.py test <chat_id>
 ```
 
-Replace `<dialog_id>` with the actual ID from Step 6, for example:
+Replace `<chat_id>` with the actual ID from Step 6, for example:
 
 ```bash
 python3 tools/tg_check.py test -1001234567890
 ```
 
 The tool will:
-1. Print the last 3 messages from the dialog so you can confirm it is the right one.
+1. Print the last 3 messages from the chat so you can confirm it is the right one.
 2. Ask if you want to send a test message.
 
-> **⚠️ WARNING:** If you type a message and press Enter, it will be sent as a **real message** visible to all members of the dialog. Press Enter without typing to skip.
-
----
-
-## Architecture
-
-```
-telegram-lib/
-├── .env.telegram.example    # Credentials template (copy to .env.telegram)
-├── pyproject.toml           # Package configuration
-├── src/
-│   ├── core/
-│   │   ├── interfaces.py    # IReader, IWriter, ISyncStateStorage, Message, Attachment
-│   │   ├── orchestrator.py  # Sync algorithm (read → write → update state)
-│   │   └── retry.py         # Async retry with exponential backoff
-│   ├── config/
-│   │   ├── schema.py        # Pydantic config models
-│   │   └── loader.py        # YAML config loader
-│   ├── messengers/
-│   │   └── telegram/
-│   │       ├── reader.py    # TelegramReader — reads messages via Telethon
-│   │       └── writer.py    # TelegramWriter — writes/forwards messages
-│   └── storage/
-│       └── firestore.py     # Firestore-based sync state persistence
-├── tools/
-│   ├── generate_session.py  # One-time session string generator
-│   └── tg_check.py          # CLI helper: list dialogs, test read/write
-└── tests/
-    ├── unit/
-    │   ├── test_orchestrator.py
-    │   └── test_telegram.py
-    └── integration/
-        └── test_firestore.py
-```
-
-## Prerequisites
-
-| Tool       | Version | Purpose                     |
-|------------|---------|-----------------------------|
-| Python     | 3.11+   | Runtime                     |
-| Telethon   | 1.36+   | Telegram client library     |
-| pydantic   | 2.6+    | Config validation           |
-| PyYAML     | 6.0+    | Config file parsing         |
-
-## Running Tests
-
-```bash
-# Unit tests (no credentials needed)
-pytest tests/unit/
-
-# Integration tests (requires Firebase emulator)
-FIRESTORE_EMULATOR_HOST=localhost:8080 pytest tests/integration/
-```
-
-## Current Status
-
-**Version:** 0.1.0 (initial working implementation)
-
-The Telegram read/write functionality is fully operational and tested.
-
-## License
-
-MIT
+> **⚠️ WARNING:** If you type a message and press Enter, it will be sent as a **real message** visible to all members of the chat. Press Enter without typing to skip.

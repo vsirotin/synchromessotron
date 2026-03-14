@@ -29,7 +29,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["src*", "functions*"]
+include = ["telegram*", "vkontakte*", "functions*"]
 
 [tool.ruff]
 line-length = 100
@@ -40,7 +40,7 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 ignore = []
 
 [tool.ruff.lint.isort]
-known-first-party = ["src", "functions"]
+known-first-party = ["telegram", "vkontakte", "functions"]
 
 [tool.black]
 line-length = 100
