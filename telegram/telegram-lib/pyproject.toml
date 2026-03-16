@@ -5,14 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "telegram-lib"
 version = "0.1.0"
-description = "Telegram integration library — read and write messages via Telegram user account API."
+description = "Stateless Python wrapper functions for the Telegram user-account API."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
 dependencies = [
-    "firebase-admin>=6.5",
-    "pydantic>=2.6",
-    "PyYAML>=6.0",
     "Telethon>=1.36",
     "python-dotenv>=1.0",
 ]

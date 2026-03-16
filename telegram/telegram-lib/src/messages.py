@@ -1,0 +1,200 @@
+"""
+Message functions — read, send, edit, delete (F1–F4).
+
+All functions are stateless wrappers around Telethon calls.
+Each returns ``TgResult`` with a typed payload or a ``TgError`` (T3, T6).
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from telethon import TelegramClient
+
+from src._logging import logged
+from src.dialogs import _map_exception
+from src.models import ErrorCode, MessageInfo, TgError, TgResult
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _to_message_info(msg, dialog_id: int) -> MessageInfo:
+    """Convert a Telethon ``Message`` to a lightweight ``MessageInfo`` (T7)."""
+    sender_name = None
+    sender_id = None
+    if msg.sender:
+        sender_id = msg.sender_id
+        sender_name = (
+            getattr(msg.sender, "first_name", None)
+            or getattr(msg.sender, "title", None)
+        )
+    return MessageInfo(
+        id=msg.id,
+        dialog_id=dialog_id,
+        text=msg.message or "",
+        date=msg.date,
+        sender_id=sender_id,
+        sender_name=sender_name,
+        has_media=msg.media is not None,
+        media_type=type(msg.media).__name__ if msg.media else None,
+    )
+
+
+# ---------------------------------------------------------------------------
+# F1 — Read messages (full / incremental)
+# ---------------------------------------------------------------------------
+
+
+@logged
+async def read_messages(
+    client: TelegramClient,
+    dialog_id: int | str,
+    *,
+    since: datetime | None = None,
+    limit: int = 100,
+) -> TgResult[list[MessageInfo]]:
+    """Read messages from a dialog, optionally since a given timestamp (F1).
+
+    When *since* is provided only messages strictly **after** that timestamp
+    are returned (incremental backup).  When omitted the most recent *limit*
+    messages are returned (full history page).
+
+    Args:
+        client: An authenticated ``TelegramClient``.
+        dialog_id: Numeric dialog ID or string handle (e.g. ``"me"``).
+        since: If set, only return messages posted after this timestamp.
+        limit: Maximum number of messages to return per call.
+
+    Returns:
+        ``TgResult`` whose payload is a list of ``MessageInfo``.
+    """
+    try:
+        entity = await client.get_entity(dialog_id)
+        raw_messages = await client.get_messages(
+            entity,
+            limit=limit,
+            offset_date=since,
+            reverse=since is not None,
+        )
+        result: list[MessageInfo] = []
+        peer_id = _resolve_peer_id(entity)
+        for msg in raw_messages:
+            if since and msg.date <= since:
+                continue
+            result.append(_to_message_info(msg, peer_id))
+        return TgResult(payload=result)
+    except ValueError as exc:
+        return TgResult(error=TgError(ErrorCode.ENTITY_NOT_FOUND, str(exc)))
+    except Exception as exc:
+        return TgResult(error=_map_exception(exc))
+
+
+# ---------------------------------------------------------------------------
+# F2 — Send a message
+# ---------------------------------------------------------------------------
+
+
+@logged
+async def send_message(
+    client: TelegramClient,
+    dialog_id: int | str,
+    text: str,
+) -> TgResult[MessageInfo]:
+    """Send a text message to a dialog on behalf of the user (F2).
+
+    Args:
+        client: An authenticated ``TelegramClient``.
+        dialog_id: Target dialog (numeric ID or string handle).
+        text: The message text to send.
+
+    Returns:
+        ``TgResult`` whose payload is the sent ``MessageInfo``.
+    """
+    try:
+        entity = await client.get_entity(dialog_id)
+        msg = await client.send_message(entity, text)
+        peer_id = _resolve_peer_id(entity)
+        return TgResult(payload=_to_message_info(msg, peer_id))
+    except ValueError as exc:
+        return TgResult(error=TgError(ErrorCode.ENTITY_NOT_FOUND, str(exc)))
+    except Exception as exc:
+        return TgResult(error=_map_exception(exc))
+
+
+# ---------------------------------------------------------------------------
+# F3 — Edit own message
+# ---------------------------------------------------------------------------
+
+
+@logged
+async def edit_message(
+    client: TelegramClient,
+    dialog_id: int | str,
+    message_id: int,
+    new_text: str,
+) -> TgResult[MessageInfo]:
+    """Edit a previously sent message (F3).
+
+    Only messages sent by the authenticated user can be edited.
+
+    Args:
+        client: An authenticated ``TelegramClient``.
+        dialog_id: The dialog containing the message.
+        message_id: ID of the message to edit.
+        new_text: The replacement text.
+
+    Returns:
+        ``TgResult`` whose payload is the updated ``MessageInfo``.
+    """
+    try:
+        entity = await client.get_entity(dialog_id)
+        msg = await client.edit_message(entity, message_id, new_text)
+        peer_id = _resolve_peer_id(entity)
+        return TgResult(payload=_to_message_info(msg, peer_id))
+    except ValueError as exc:
+        return TgResult(error=TgError(ErrorCode.ENTITY_NOT_FOUND, str(exc)))
+    except Exception as exc:
+        return TgResult(error=_map_exception(exc))
+
+
+# ---------------------------------------------------------------------------
+# F4 — Delete own message
+# ---------------------------------------------------------------------------
+
+
+@logged
+async def delete_message(
+    client: TelegramClient,
+    dialog_id: int | str,
+    message_ids: list[int],
+) -> TgResult[list[int]]:
+    """Delete one or more of the user's own messages (F4).
+
+    Args:
+        client: An authenticated ``TelegramClient``.
+        dialog_id: The dialog containing the messages.
+        message_ids: IDs of the messages to delete.
+
+    Returns:
+        ``TgResult`` whose payload is the list of deleted message IDs.
+    """
+    try:
+        entity = await client.get_entity(dialog_id)
+        await client.delete_messages(entity, message_ids)
+        return TgResult(payload=message_ids)
+    except ValueError as exc:
+        return TgResult(error=TgError(ErrorCode.ENTITY_NOT_FOUND, str(exc)))
+    except Exception as exc:
+        return TgResult(error=_map_exception(exc))
+
+
+# ---------------------------------------------------------------------------
+# Utility
+# ---------------------------------------------------------------------------
+
+
+def _resolve_peer_id(entity) -> int:
+    """Extract a stable numeric ID from a Telethon entity."""
+    return getattr(entity, "id", 0)

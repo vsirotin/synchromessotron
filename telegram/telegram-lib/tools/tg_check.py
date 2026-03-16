@@ -8,8 +8,8 @@ Commands:
 
   python3 tools/tg_check.py list
 
-      Lists your 50 most recent Telegram dialogs with their numeric IDs.
-      Use this to find the ID of the group or chat you want to sync.
+      Lists all Telegram dialogs with their numeric IDs.
+      Use this to find the ID of the dialog you want to work with.
 
   python3 tools/tg_check.py test <dialog_id>
 
@@ -86,14 +86,13 @@ async def cmd_list() -> None:
         )
         print(f"  {'TYPE':<12} {'ID':<18} NAME")
         print(f"  {'-'*12} {'-'*18} {'-'*45}")
-        async for dialog in client.iter_dialogs(limit=50):
+        async for dialog in client.iter_dialogs(limit=None):
             e = dialog.entity
             kind = type(e).__name__
             uname = f"  @{e.username}" if getattr(e, "username", None) else ""
             print(f"  {kind:<12} {str(dialog.id):<18} {dialog.name}{uname}")
         print()
-    print("Copy the ID (including the minus sign for groups/channels)")
-    print("and use it as account_id in your config.yaml.\n")
+    print("Copy the ID (including the minus sign for groups/channels).\n")
 
 
 async def cmd_test(dialog_id: str) -> None:

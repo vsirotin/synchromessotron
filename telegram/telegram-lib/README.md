@@ -1,13 +1,21 @@
 # telegram-lib
 
-Python library providing Telegram integration functions for reading and writing messages via the Telegram user account API.
+A library of stateless Python functions that wraps the Telegram user-account API via [Telethon](https://github.com/LorenzoTheWorker/Telethon).
 
 ## Overview
 
-This library implements the core Telegram functionality used by other subprojects (`telegram-cli`, `telegram-web`, etc.). It authenticates as a **user account** (not a bot) using the [Telethon](https://github.com/LorenzoTheWorker/Telethon) library and provides:
+This library provides the core Telegram functionality used by other subprojects (`telegram-cli`, `telegram-web`, etc.). It authenticates as a **user account** (not a bot) and exposes stateless wrapper functions for the user's dialogs, groups, and channels:
 
-- **Reading** messages from channels and groups where the user is a member, and from conversations with other users.
-- **Writing** messages to channels and groups where the user is a member, and to conversations with other users.
+- **F1 — Backup:** full and incremental backup of message history.
+- **F2 — Send:** send messages on behalf of the user's account.
+- **F3 — Edit:** edit and resend the user's own messages.
+- **F4 — Delete:** delete the user's own messages.
+- **F5 — Dialogs:** retrieve the complete list of the user's dialogs, groups, and channels.
+- **F6 — Media:** download individual messages, photos, and media files.
+- **F7 — Availability:** check whether the Telegram service is reachable.
+- **F8 — Session:** validate the current user session.
+
+> **Terminology:** In the Telegram API the term **"dialog"** denotes any conversation the user participates in — a one-to-one chat with another user, a group, or a channel. This is the official term used by the MTProto protocol and the Telethon library, and it is preserved throughout this project.
 
 ---
 
@@ -25,7 +33,7 @@ pip install -e ".[dev]"
 
 ### Step 2 — Run unit tests
 
-Unit tests verify the core logic — the sync algorithm, error handling, and the Telegram read/write logic — using mocked API calls. **No real credentials, no internet connection needed.**
+Unit tests verify every library function (F1–F8) — including error handling and the Result/Error contract — using mocked API calls. **No real credentials, no internet connection needed.**
 
 ```bash
 pytest tests/unit/
@@ -94,9 +102,9 @@ TG_SESSION=your_generated_session_string_here
 
 **Treat the session string like a password.**
 
-### Step 6 — List your chats
+### Step 6 — List your dialogs
 
-Run the chat listing tool to confirm your credentials work and see all your Telegram chats with their numeric IDs:
+Run the dialog listing tool to confirm your credentials work and see all your Telegram dialogs with their numeric IDs:
 
 ```bash
 python3 tools/tg_check.py list
@@ -117,25 +125,27 @@ Example output:
 | Type      | What it is                                          |
 |-----------|-----------------------------------------------------|
 | `Channel` | A Telegram channel or supergroup (large/public)     |
-| `Chat`    | A regular group chat                                |
-| `User`    | A direct message conversation with a person         |
+| `Chat`    | A regular group (legacy, non-supergroup)             |
+| `User`    | A direct message dialog with another person         |
 
-Note the **ID** of the chat you want to test — including the minus sign for groups and channels.
+All three types are "dialogs" in the Telegram API sense.
+
+Note the **ID** of the dialog you want to test — including the minus sign for groups and channels.
 
 ### Step 7 — Verify read and write access
 
 ```bash
-python3 tools/tg_check.py test <chat_id>
+python3 tools/tg_check.py test <dialog_id>
 ```
 
-Replace `<chat_id>` with the actual ID from Step 6, for example:
+Replace `<dialog_id>` with the actual ID from Step 6, for example:
 
 ```bash
 python3 tools/tg_check.py test -1001234567890
 ```
 
 The tool will:
-1. Print the last 3 messages from the chat so you can confirm it is the right one.
+1. Print the last 3 messages from the dialog so you can confirm it is the right one.
 2. Ask if you want to send a test message.
 
-> **⚠️ WARNING:** If you type a message and press Enter, it will be sent as a **real message** visible to all members of the chat. Press Enter without typing to skip.
+> **⚠️ WARNING:** If you type a message and press Enter, it will be sent as a **real message** visible to all members of the dialog. Press Enter without typing to skip.

@@ -1,181 +1,365 @@
-"""Unit tests for Telegram Reader and Writer."""
+"""
+Unit tests for telegram-lib stateless wrapper functions.
+
+Tests are organised by functional requirement (T10):
+  F1 — read_messages (full / incremental backup)
+  F2 — send_message
+  F3 — edit_message
+  F4 — delete_message
+  F5 — get_dialogs
+  F6 — download_media
+  F7 — check_availability
+  F8 — validate_session
+
+All tests use mocked Telethon objects — no credentials or network needed.
+"""
 
 from __future__ import annotations
 
-import json
-import os
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.core.interfaces import Message, MessengerAccount
+from src.models import ErrorCode
 
-CREDS = json.dumps({"api_id": 12345, "api_hash": "test_hash", "session": ""})
-ACCOUNT = MessengerAccount(
-    messenger_id="telegram",
-    account_id="test_peer",
-    credentials_ref="TG_CREDS",
-)
+# Shared fixtures -------------------------------------------------------
+
 SINCE = datetime(2026, 3, 1, 12, 0, 0, tzinfo=UTC)
 MSG_TIME = datetime(2026, 3, 1, 12, 0, 1, tzinfo=UTC)
 
 
-def _make_tg_msg(msg_id=1, text="Hello", date=MSG_TIME):
+def _make_tg_msg(msg_id=1, text="Hello", date=MSG_TIME, media=None):
     msg = MagicMock()
     msg.id = msg_id
     msg.message = text
     msg.date = date
-    msg.media = None
+    msg.media = media
+    msg.sender = MagicMock()
+    msg.sender_id = 42
+    msg.sender.first_name = "Test"
+    msg.sender.title = None
     return msg
 
 
-def _make_mock_client(messages=None):
-    """Build a mock TelegramClient async context manager."""
+def _mock_entity(entity_id=123):
+    e = MagicMock()
+    e.id = entity_id
+    e.username = "testuser"
+    e.title = None
+    e.first_name = "Test"
+    return e
+
+
+def _mock_client():
     client = AsyncMock()
-    client.__aenter__ = AsyncMock(return_value=client)
-    client.__aexit__ = AsyncMock(return_value=False)
-
-    async def _iter(*args, **kwargs):
-        for m in messages or []:
-            yield m
-
-    client.iter_messages = _iter
-    client.send_message = AsyncMock()
-    client.forward_messages = AsyncMock()
+    client.is_connected.return_value = True
     return client
 
 
-# ---------------------------------------------------------------------------
-# Reader tests
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------
+# F5 — get_dialogs
+# -----------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_telegram_reader_returns_messages_after_since():
-    from src.messengers.telegram.reader import TelegramReader
+class TestGetDialogs:
+    """F5: retrieve the user's dialog list."""
 
-    mock_client = _make_mock_client([_make_tg_msg()])
-    with (
-        patch("src.messengers.telegram.reader.TelegramClient", return_value=mock_client),
-        patch.dict(os.environ, {"TG_CREDS": CREDS}),
-    ):
-        messages = await TelegramReader().read_since(ACCOUNT, SINCE)
+    @pytest.mark.asyncio
+    async def test_returns_dialog_list(self):
+        from src.dialogs import get_dialogs
 
-    assert len(messages) == 1
-    assert messages[0].text == "Hello"
-    assert messages[0].source_messenger == "telegram"
-    assert messages[0].metadata["peer_id"] == "test_peer"
+        dialog = MagicMock()
+        dialog.id = -100123
+        dialog.name = "Family Group"
+        dialog.unread_count = 2
+        dialog.entity = MagicMock()
+        dialog.entity.__class__.__name__ = "Channel"
+        type(dialog.entity).__name__ = "Channel"
+        dialog.entity.username = "familygroup"
 
+        client = _mock_client()
 
-@pytest.mark.asyncio
-async def test_telegram_reader_skips_messages_at_or_before_since():
-    from src.messengers.telegram.reader import TelegramReader
+        async def _iter_dialogs(limit=100):
+            yield dialog
 
-    old_msg = _make_tg_msg(date=SINCE)  # exactly at since — must be excluded
-    mock_client = _make_mock_client([old_msg])
-    with (
-        patch("src.messengers.telegram.reader.TelegramClient", return_value=mock_client),
-        patch.dict(os.environ, {"TG_CREDS": CREDS}),
-    ):
-        messages = await TelegramReader().read_since(ACCOUNT, SINCE)
+        client.iter_dialogs = _iter_dialogs
 
-    assert messages == []
+        result = await get_dialogs(client, limit=10)
 
+        assert result.ok
+        assert len(result.payload) == 1
+        assert result.payload[0].id == -100123
+        assert result.payload[0].name == "Family Group"
+        assert result.payload[0].unread_count == 2
 
-@pytest.mark.asyncio
-async def test_telegram_reader_raises_on_missing_credentials():
-    from src.messengers.telegram.reader import TelegramReader
+    @pytest.mark.asyncio
+    async def test_returns_error_on_connection_failure(self):
+        from src.dialogs import get_dialogs
 
-    clean_env = {k: v for k, v in os.environ.items() if k != "TG_CREDS"}
-    with (
-        patch.dict(os.environ, clean_env, clear=True),
-        pytest.raises(OSError, match="TG_CREDS"),
-    ):
-        await TelegramReader().read_since(ACCOUNT, SINCE)
+        client = _mock_client()
 
+        async def _iter_dialogs(limit=100):
+            raise ConnectionError("no network")
+            yield  # make it an async generator  # noqa: E501
 
-# ---------------------------------------------------------------------------
-# Writer tests
-# ---------------------------------------------------------------------------
+        client.iter_dialogs = _iter_dialogs
 
+        result = await get_dialogs(client)
 
-@pytest.mark.asyncio
-async def test_telegram_writer_reposts_cross_messenger_message():
-    from src.messengers.telegram.writer import TelegramWriter
-
-    msg = Message(id="1", text="Hi from VK", timestamp=MSG_TIME, source_messenger="vk")
-    mock_client = _make_mock_client()
-    with (
-        patch("src.messengers.telegram.writer.TelegramClient", return_value=mock_client),
-        patch.dict(os.environ, {"TG_CREDS": CREDS}),
-    ):
-        await TelegramWriter(strategy="repost").write(ACCOUNT, [msg])
-
-    mock_client.send_message.assert_called_once()
-    call_text = mock_client.send_message.call_args[0][1]
-    assert "[From Vk]" in call_text
-    assert "Hi from VK" in call_text
+        assert not result.ok
+        assert result.error.code == ErrorCode.NETWORK_ERROR
 
 
-@pytest.mark.asyncio
-async def test_telegram_writer_forwards_telegram_message():
-    from src.messengers.telegram.writer import TelegramWriter
-
-    msg = Message(
-        id="42",
-        text="Hello",
-        timestamp=MSG_TIME,
-        source_messenger="telegram",
-        metadata={"peer_id": "source_peer", "message_id": 42},
-    )
-    mock_client = _make_mock_client()
-    with (
-        patch("src.messengers.telegram.writer.TelegramClient", return_value=mock_client),
-        patch.dict(os.environ, {"TG_CREDS": CREDS}),
-    ):
-        await TelegramWriter(strategy="forward").write(ACCOUNT, [msg])
-
-    mock_client.forward_messages.assert_called_once_with(
-        "test_peer", [42], from_peer="source_peer"
-    )
-    mock_client.send_message.assert_not_called()
+# -----------------------------------------------------------------------
+# F1 — read_messages
+# -----------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_telegram_writer_reposts_when_forward_strategy_but_source_is_vk():
-    from src.messengers.telegram.writer import TelegramWriter
+class TestReadMessages:
+    """F1: full and incremental backup via message reading."""
 
-    msg = Message(
-        id="1",
-        text="Cross-platform",
-        timestamp=MSG_TIME,
-        source_messenger="vk",
-        metadata={"peer_id": "12345", "message_id": 1},
-    )
-    mock_client = _make_mock_client()
-    with (
-        patch("src.messengers.telegram.writer.TelegramClient", return_value=mock_client),
-        patch.dict(os.environ, {"TG_CREDS": CREDS}),
-    ):
-        await TelegramWriter(strategy="forward").write(ACCOUNT, [msg])
+    @pytest.mark.asyncio
+    async def test_read_returns_messages(self):
+        from src.messages import read_messages
 
-    mock_client.send_message.assert_called_once()
-    mock_client.forward_messages.assert_not_called()
+        client = _mock_client()
+        entity = _mock_entity()
+        client.get_entity = AsyncMock(return_value=entity)
+        client.get_messages = AsyncMock(return_value=[_make_tg_msg()])
+
+        result = await read_messages(client, 123)
+
+        assert result.ok
+        assert len(result.payload) == 1
+        assert result.payload[0].text == "Hello"
+        assert result.payload[0].dialog_id == 123
+
+    @pytest.mark.asyncio
+    async def test_incremental_read_skips_old(self):
+        from src.messages import read_messages
+
+        old_msg = _make_tg_msg(date=SINCE)
+        new_msg = _make_tg_msg(msg_id=2, text="New", date=MSG_TIME)
+
+        client = _mock_client()
+        client.get_entity = AsyncMock(return_value=_mock_entity())
+        client.get_messages = AsyncMock(return_value=[old_msg, new_msg])
+
+        result = await read_messages(client, 123, since=SINCE)
+
+        assert result.ok
+        assert len(result.payload) == 1
+        assert result.payload[0].text == "New"
+
+    @pytest.mark.asyncio
+    async def test_read_entity_not_found(self):
+        from src.messages import read_messages
+
+        client = _mock_client()
+        client.get_entity = AsyncMock(side_effect=ValueError("not found"))
+
+        result = await read_messages(client, 999)
+
+        assert not result.ok
+        assert result.error.code == ErrorCode.ENTITY_NOT_FOUND
 
 
-@pytest.mark.asyncio
-async def test_telegram_writer_adds_no_attribution_for_same_messenger():
-    from src.messengers.telegram.writer import TelegramWriter
+# -----------------------------------------------------------------------
+# F2 — send_message
+# -----------------------------------------------------------------------
 
-    msg = Message(id="1", text="Own message", timestamp=MSG_TIME, source_messenger="telegram")
-    mock_client = _make_mock_client()
-    with (
-        patch("src.messengers.telegram.writer.TelegramClient", return_value=mock_client),
-        patch.dict(os.environ, {"TG_CREDS": CREDS}),
-    ):
-        await TelegramWriter(strategy="repost").write(ACCOUNT, [msg])
 
-    call_text = mock_client.send_message.call_args[0][1]
-    assert "[From" not in call_text
-    assert call_text == "Own message"
+class TestSendMessage:
+    """F2: send a message under the user's account."""
+
+    @pytest.mark.asyncio
+    async def test_send_returns_message_info(self):
+        from src.messages import send_message
+
+        client = _mock_client()
+        entity = _mock_entity()
+        client.get_entity = AsyncMock(return_value=entity)
+        client.send_message = AsyncMock(return_value=_make_tg_msg(text="Sent"))
+
+        result = await send_message(client, 123, "Sent")
+
+        assert result.ok
+        assert result.payload.text == "Sent"
+        client.send_message.assert_called_once_with(entity, "Sent")
+
+
+# -----------------------------------------------------------------------
+# F3 — edit_message
+# -----------------------------------------------------------------------
+
+
+class TestEditMessage:
+    """F3: edit a previously sent message."""
+
+    @pytest.mark.asyncio
+    async def test_edit_returns_updated_info(self):
+        from src.messages import edit_message
+
+        client = _mock_client()
+        entity = _mock_entity()
+        client.get_entity = AsyncMock(return_value=entity)
+        client.edit_message = AsyncMock(return_value=_make_tg_msg(text="Edited"))
+
+        result = await edit_message(client, 123, 1, "Edited")
+
+        assert result.ok
+        assert result.payload.text == "Edited"
+        client.edit_message.assert_called_once_with(entity, 1, "Edited")
+
+
+# -----------------------------------------------------------------------
+# F4 — delete_message
+# -----------------------------------------------------------------------
+
+
+class TestDeleteMessage:
+    """F4: delete own messages."""
+
+    @pytest.mark.asyncio
+    async def test_delete_returns_deleted_ids(self):
+        from src.messages import delete_message
+
+        client = _mock_client()
+        entity = _mock_entity()
+        client.get_entity = AsyncMock(return_value=entity)
+        client.delete_messages = AsyncMock()
+
+        result = await delete_message(client, 123, [1, 2])
+
+        assert result.ok
+        assert result.payload == [1, 2]
+        client.delete_messages.assert_called_once_with(entity, [1, 2])
+
+
+# -----------------------------------------------------------------------
+# F6 — download_media
+# -----------------------------------------------------------------------
+
+
+class TestDownloadMedia:
+    """F6: download photos and media files."""
+
+    @pytest.mark.asyncio
+    async def test_download_no_media(self):
+        from src.media import download_media
+
+        msg = _make_tg_msg(media=None)
+        client = _mock_client()
+        client.get_entity = AsyncMock(return_value=_mock_entity())
+        client.get_messages = AsyncMock(return_value=[msg])
+
+        result = await download_media(client, 123, 1)
+
+        assert not result.ok
+        assert result.error.code == ErrorCode.ENTITY_NOT_FOUND
+        assert "no media" in result.error.message
+
+    @pytest.mark.asyncio
+    async def test_download_message_not_found(self):
+        from src.media import download_media
+
+        client = _mock_client()
+        client.get_entity = AsyncMock(return_value=_mock_entity())
+        client.get_messages = AsyncMock(return_value=[None])
+
+        result = await download_media(client, 123, 999)
+
+        assert not result.ok
+        assert result.error.code == ErrorCode.ENTITY_NOT_FOUND
+
+
+# -----------------------------------------------------------------------
+# F7 — check_availability
+# -----------------------------------------------------------------------
+
+
+class TestCheckAvailability:
+    """F7: verify Telegram is reachable."""
+
+    @pytest.mark.asyncio
+    async def test_available(self):
+        from src.health import check_availability
+
+        client = _mock_client()
+        client.is_connected = MagicMock(return_value=True)
+        client.get_me = AsyncMock(return_value=MagicMock())
+
+        result = await check_availability(client)
+
+        assert result.ok
+        assert result.payload.available is True
+        assert result.payload.latency_ms is not None
+
+
+# -----------------------------------------------------------------------
+# F8 — validate_session
+# -----------------------------------------------------------------------
+
+
+class TestValidateSession:
+    """F8: validate the current user session."""
+
+    @pytest.mark.asyncio
+    async def test_valid_session(self):
+        from src.health import validate_session
+
+        me = MagicMock()
+        me.id = 42
+        me.first_name = "Test"
+        me.last_name = "User"
+        me.username = "testuser"
+        me.phone = "+1234567890"
+
+        client = _mock_client()
+        client.get_me = AsyncMock(return_value=me)
+
+        result = await validate_session(client)
+
+        assert result.ok
+        assert result.payload.valid is True
+        assert result.payload.user_id == 42
+        assert result.payload.username == "testuser"
+
+    @pytest.mark.asyncio
+    async def test_invalid_session(self):
+        from src.health import validate_session
+
+        client = _mock_client()
+        client.get_me = AsyncMock(return_value=None)
+
+        result = await validate_session(client)
+
+        assert not result.ok
+        assert result.error.code == ErrorCode.SESSION_INVALID
+
+
+# -----------------------------------------------------------------------
+# Error handling (T3) — rate limiting
+# -----------------------------------------------------------------------
+
+
+class TestErrorHandling:
+    """T3: library catches all exceptions and returns TgError."""
+
+    @pytest.mark.asyncio
+    async def test_rate_limit_returns_retry_after(self):
+        from telethon.errors import FloodWaitError
+
+        from src.messages import read_messages
+
+        client = _mock_client()
+        exc = FloodWaitError(request=None, capture=30)
+        client.get_entity = AsyncMock(side_effect=exc)
+
+        result = await read_messages(client, 123)
+
+        assert not result.ok
+        assert result.error.code == ErrorCode.RATE_LIMITED
+        assert result.error.retry_after == 30.0
+
