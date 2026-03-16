@@ -26,12 +26,17 @@ Examples:
 """
 
 import asyncio
+import logging
 import sys
 from pathlib import Path
 
 from dotenv import dotenv_values
 from telethon import TelegramClient
 from telethon.sessions import StringSession
+
+# Suppress Telethon's noisy "Attempt N at connecting failed" retry messages.
+# Without this, users see 5–6 scary OSError lines before the clean error.
+logging.getLogger("telethon").setLevel(logging.CRITICAL)
 
 
 def _find_env_file() -> Path:
@@ -78,65 +83,71 @@ def _make_client(creds: dict) -> TelegramClient:
 async def cmd_list() -> None:
     """List all dialogs with their IDs."""
     creds = _load_creds()
-    async with _make_client(creds) as client:
-        me = await client.get_me()
-        print(
-            f"\n✓ Logged in as: {me.first_name} {me.last_name or ''}"
-            f" (@{me.username or 'no username'}, id={me.id})\n"
-        )
-        print(f"  {'TYPE':<12} {'ID':<18} NAME")
-        print(f"  {'-'*12} {'-'*18} {'-'*45}")
-        async for dialog in client.iter_dialogs(limit=None):
-            e = dialog.entity
-            kind = type(e).__name__
-            uname = f"  @{e.username}" if getattr(e, "username", None) else ""
-            print(f"  {kind:<12} {str(dialog.id):<18} {dialog.name}{uname}")
-        print()
+    try:
+        async with _make_client(creds) as client:
+            me = await client.get_me()
+            print(
+                f"\n✓ Logged in as: {me.first_name} {me.last_name or ''}"
+                f" (@{me.username or 'no username'}, id={me.id})\n"
+            )
+            print(f"  {'TYPE':<12} {'ID':<18} NAME")
+            print(f"  {'-'*12} {'-'*18} {'-'*45}")
+            async for dialog in client.iter_dialogs(limit=None):
+                e = dialog.entity
+                kind = type(e).__name__
+                uname = f"  @{e.username}" if getattr(e, "username", None) else ""
+                print(f"  {kind:<12} {str(dialog.id):<18} {dialog.name}{uname}")
+            print()
+    except (ConnectionError, OSError, TimeoutError) as exc:
+        sys.exit(f"Error [NETWORK_ERROR]: {exc}")
     print("Copy the ID (including the minus sign for groups/channels).\n")
 
 
 async def cmd_test(dialog_id: str) -> None:
     """Show last 3 messages and send an optional test message."""
     creds = _load_creds()
-    async with _make_client(creds) as client:
-        # Resolve dialog — accept numeric IDs and string handles like "me" or "@username"
-        entity_ref = int(dialog_id) if dialog_id.lstrip("-").isdigit() else dialog_id
-        try:
-            entity = await client.get_entity(entity_ref)
-        except ValueError as e:
-            sys.exit(f"Error: could not find dialog {dialog_id!r}: {e}")
+    try:
+        async with _make_client(creds) as client:
+            # Resolve dialog — accept numeric IDs and string handles like "me" or "@username"
+            entity_ref = int(dialog_id) if dialog_id.lstrip("-").isdigit() else dialog_id
+            try:
+                entity = await client.get_entity(entity_ref)
+            except ValueError as e:
+                sys.exit(f"Error: could not find dialog {dialog_id!r}: {e}")
 
-        title = getattr(entity, "title", None) or getattr(entity, "first_name", dialog_id)
-        print(f"\n✓ Dialog: {title}  (id={dialog_id})\n")
+            title = getattr(entity, "title", None) or getattr(entity, "first_name", dialog_id)
+            print(f"\n✓ Dialog: {title}  (id={dialog_id})\n")
 
-        messages = await client.get_messages(entity, limit=3)
-        if not messages:
-            print("  (no messages in this dialog yet)\n")
-        else:
-            print("  Last 3 messages (oldest first):")
-            print(f"  {'-'*60}")
-            for msg in reversed(messages):
-                ts = msg.date.astimezone().strftime("%Y-%m-%d %H:%M")
-                sender = ""
-                if msg.sender:
-                    sender = (
-                        getattr(msg.sender, "first_name", None)
-                        or getattr(msg.sender, "title", None)
-                        or "?"
-                    )
-                text = msg.text or "(media / no text)"
-                # Truncate long messages for display
-                if len(text) > 80:
-                    text = text[:77] + "..."
-                print(f"  [{ts}] {sender}: {text}")
-            print(f"  {'-'*60}\n")
+            messages = await client.get_messages(entity, limit=3)
+            if not messages:
+                print("  (no messages in this dialog yet)\n")
+            else:
+                print("  Last 3 messages (oldest first):")
+                print(f"  {'-'*60}")
+                for msg in reversed(messages):
+                    ts = msg.date.astimezone().strftime("%Y-%m-%d %H:%M")
+                    sender = ""
+                    if msg.sender:
+                        sender = (
+                            getattr(msg.sender, "first_name", None)
+                            or getattr(msg.sender, "title", None)
+                            or "?"
+                        )
+                    text = msg.text or "(media / no text)"
+                    # Truncate long messages for display
+                    if len(text) > 80:
+                        text = text[:77] + "..."
+                    print(f"  [{ts}] {sender}: {text}")
+                print(f"  {'-'*60}\n")
 
-        text = input("Send a test message (press Enter to skip): ").strip()
-        if text:
-            await client.send_message(entity, text)
-            print("✓ Message sent.\n")
-        else:
-            print("Skipped.\n")
+            text = input("Send a test message (press Enter to skip): ").strip()
+            if text:
+                await client.send_message(entity, text)
+                print("✓ Message sent.\n")
+            else:
+                print("Skipped.\n")
+    except (ConnectionError, OSError, TimeoutError) as exc:
+        sys.exit(f"Error [NETWORK_ERROR]: {exc}")
 
 
 def main() -> None:

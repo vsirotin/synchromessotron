@@ -66,7 +66,12 @@ def _map_exception(exc: Exception) -> TgError:
     """Map a Telethon/network exception to a ``TgError``."""
     from telethon.errors import (
         AuthKeyUnregisteredError,
+        ChatWriteForbiddenError,
         FloodWaitError,
+        MessageAuthorRequiredError,
+        MessageDeleteForbiddenError,
+        MessageIdInvalidError,
+        MessageNotModifiedError,
         UserDeactivatedBanError,
     )
 
@@ -80,6 +85,14 @@ def _map_exception(exc: Exception) -> TgError:
         return TgError(ErrorCode.SESSION_INVALID, "Session is invalid or revoked")
     if isinstance(exc, UserDeactivatedBanError):
         return TgError(ErrorCode.AUTH_FAILED, "User account is deactivated or banned")
+    if isinstance(exc, MessageNotModifiedError):
+        return TgError(ErrorCode.NOT_MODIFIED, "Message content was not modified (new text is identical to current)")
+    if isinstance(exc, (MessageAuthorRequiredError, ChatWriteForbiddenError, MessageDeleteForbiddenError)):
+        return TgError(ErrorCode.PERMISSION_DENIED, str(exc))
+    if isinstance(exc, MessageIdInvalidError):
+        return TgError(ErrorCode.ENTITY_NOT_FOUND, f"Message not found: {exc}")
+    if isinstance(exc, (TimeoutError, OSError)):
+        return TgError(ErrorCode.NETWORK_ERROR, str(exc) or "Connection timed out")
     return TgError(
         ErrorCode.INTERNAL_ERROR,
         str(exc),

@@ -39,7 +39,20 @@ Unit tests verify every library function (F1–F8) — including error handling 
 pytest tests/unit/
 ```
 
-You should see all tests pass. If any fail, check that dependencies installed correctly and that you are running Python 3.11 or later.
+**Expected result:**
+
+```
+=============== 18 passed in 0.15s ===============
+```
+
+All tests pass. No credentials or network needed.
+
+**What can go wrong:**
+
+| Symptom | Cause | What to do |
+|---------|-------|------------|
+| `ModuleNotFoundError: No module named 'telethon'` | Dependencies not installed. | Run `pip install -e ".[dev]"` again. |
+| `SyntaxError` or version-related failures | Python version below 3.11. | Check `python3 --version` — must be 3.11+. |
 
 ---
 
@@ -110,7 +123,7 @@ Run the dialog listing tool to confirm your credentials work and see all your Te
 python3 tools/tg_check.py list
 ```
 
-Example output:
+**Expected result:**
 
 ```
 ✓ Logged in as: Your Name (@yourhandle, id=123456789)
@@ -132,6 +145,14 @@ All three types are "dialogs" in the Telegram API sense.
 
 Note the **ID** of the dialog you want to test — including the minus sign for groups and channels.
 
+**What can go wrong:**
+
+| Output | Cause | What to do |
+|--------|-------|------------|
+| `Error [SESSION_INVALID]: Session is invalid or revoked` | Session string is wrong or expired. | Re-run `python3 tools/generate_session.py` and update `TG_SESSION` in `.env.telegram`. |
+| `Error [AUTH_FAILED]: User account is deactivated or banned` | Telegram account is suspended. | Contact Telegram support. |
+| `Error [NETWORK_ERROR]: ...` | No internet or Telegram is blocked. | Check your network connection. |
+
 ### Step 7 — Verify read and write access
 
 ```bash
@@ -149,3 +170,50 @@ The tool will:
 2. Ask if you want to send a test message.
 
 > **⚠️ WARNING:** If you type a message and press Enter, it will be sent as a **real message** visible to all members of the dialog. Press Enter without typing to skip.
+
+**Expected result:**
+
+```
+Last 3 messages from -1001234567890:
+  [42] 2026-03-15 10:00  Test User: Hello everyone
+  [41] 2026-03-14 18:30  Test User: See you tomorrow
+  [40] 2026-03-14 12:00  Other User: Got it
+
+Type a message to send (or press Enter to skip):
+```
+
+**What can go wrong:**
+
+| Output | Cause | What to do |
+|--------|-------|------------|
+| `Error [ENTITY_NOT_FOUND]: ...` | The dialog ID is wrong or you don't have access. | Double-check the ID from Step 6. Include the minus sign for groups/channels. |
+| `Error [PERMISSION_DENIED]: ...` | You are in a read-only channel. | Choose a dialog where you have write access. |
+| `Error [RATE_LIMITED]: ... retry after Ns` | Too many API calls. | Wait N seconds and try again. |
+
+---
+
+## Manual Tests
+
+### Test: No network connection
+
+This test verifies that the library returns `NETWORK_ERROR` when Telegram is unreachable.
+
+**Setup:** Disconnect from the internet (turn off Wi-Fi, unplug the cable, or enable airplane mode).
+
+**Steps:**
+
+```bash
+python3 tools/tg_check.py list
+```
+
+**Expected result:**
+
+The command fails with a clean error message and exit code 1:
+
+```
+Error [NETWORK_ERROR]: Connection to Telegram failed 5 time(s)
+```
+
+The function `get_dialogs()` returns `TgResult` with `error.code == ErrorCode.NETWORK_ERROR`.
+
+**Teardown:** Re-enable your network connection.

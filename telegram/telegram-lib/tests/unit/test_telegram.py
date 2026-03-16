@@ -363,3 +363,73 @@ class TestErrorHandling:
         assert result.error.code == ErrorCode.RATE_LIMITED
         assert result.error.retry_after == 30.0
 
+
+# -----------------------------------------------------------------------
+# Timeout handling — asyncio.TimeoutError → NETWORK_ERROR
+# -----------------------------------------------------------------------
+
+
+class TestTimeoutHandling:
+    """Timeout errors must be reported as NETWORK_ERROR."""
+
+    @pytest.mark.asyncio
+    async def test_ping_timeout(self):
+        import asyncio
+
+        from src.health import check_availability
+
+        client = _mock_client()
+        client.get_me = AsyncMock(side_effect=asyncio.TimeoutError())
+
+        result = await check_availability(client)
+
+        assert not result.ok
+        assert result.error.code == ErrorCode.NETWORK_ERROR
+
+    @pytest.mark.asyncio
+    async def test_get_dialogs_timeout(self):
+        import asyncio
+
+        from src.dialogs import get_dialogs
+
+        client = _mock_client()
+
+        async def _iter_timeout(limit=100):
+            raise asyncio.TimeoutError()
+            yield  # noqa: E501
+
+        client.iter_dialogs = _iter_timeout
+
+        result = await get_dialogs(client)
+
+        assert not result.ok
+        assert result.error.code == ErrorCode.NETWORK_ERROR
+
+    @pytest.mark.asyncio
+    async def test_read_messages_timeout(self):
+        import asyncio
+
+        from src.messages import read_messages
+
+        client = _mock_client()
+        client.get_entity = AsyncMock(side_effect=asyncio.TimeoutError())
+
+        result = await read_messages(client, 123)
+
+        assert not result.ok
+        assert result.error.code == ErrorCode.NETWORK_ERROR
+
+    @pytest.mark.asyncio
+    async def test_send_message_timeout(self):
+        import asyncio
+
+        from src.messages import send_message
+
+        client = _mock_client()
+        client.get_entity = AsyncMock(side_effect=asyncio.TimeoutError())
+
+        result = await send_message(client, 123, "Hello")
+
+        assert not result.ok
+        assert result.error.code == ErrorCode.NETWORK_ERROR
+
