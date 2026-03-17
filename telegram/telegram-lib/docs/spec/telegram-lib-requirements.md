@@ -18,6 +18,7 @@ The library provides the following capabilities for Telegram dialogs, groups, an
 - F6. Downloading individual messages, photos, and media files.
 - F7. Checking the availability of Telegram.
 - F8. Validating the current (given) user session.
+- F9. Returning the library version as a JSON-serialisable object with the same structure as `src/version.yaml` (fields: `version`, `build`, `datetime`).
 
 ## Technical Requirements
 

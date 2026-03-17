@@ -144,3 +144,15 @@ class ServiceStatus:
 
     available: bool
     latency_ms: float | None = None
+
+
+@dataclass(frozen=True)
+class VersionInfo:
+    """Library version information (F9).
+
+    Mirrors the structure of ``src/version.yaml``.
+    """
+
+    version: str
+    build: int
+    datetime: str

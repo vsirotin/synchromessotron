@@ -361,6 +361,49 @@ telegram-cli whoami
 
 ---
 
+### F9 — Show version information
+
+Display version information as a JSON object containing both the library version and the CLI's own version.
+
+**Signature:**
+
+```
+telegram-cli version
+```
+
+**Arguments:** None.
+
+**Examples:**
+
+```bash
+telegram-cli version
+```
+
+**Output (success):**
+
+```json
+{
+  "cli": {
+    "version": "1.0.0",
+    "build": 1,
+    "datetime": "2026-03-17T00:00:00Z"
+  },
+  "lib": {
+    "version": "1.2.0",
+    "build": 3,
+    "datetime": "2026-03-18T00:00:00Z"
+  }
+}
+```
+
+**Possible errors:**
+
+| Error code | When it happens |
+|------------|-----------------|
+| `INTERNAL_ERROR` | Version file is missing or malformed. |
+
+---
+
 ## Technical Requirements
 
 - T1. Credentials are loaded from the `.env.telegram` file using `python-dotenv`.

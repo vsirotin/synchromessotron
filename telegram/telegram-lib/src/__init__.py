@@ -11,10 +11,12 @@ Public API:
     download_media      — Download media from a message (F6).
     check_availability  — Ping Telegram (F7).
     validate_session    — Validate a session string (F8).
+    get_version         — Return library version info (F9).
 
 Models:
     TgResult, TgError, ErrorCode,
-    DialogInfo, MessageInfo, MediaResult, SessionInfo, ServiceStatus
+    DialogInfo, MessageInfo, MediaResult, SessionInfo, ServiceStatus,
+    VersionInfo
 """
 
 from src.client import create_client
@@ -22,6 +24,7 @@ from src.dialogs import get_dialogs
 from src.health import check_availability, validate_session
 from src.media import download_media
 from src.messages import delete_message, edit_message, read_messages, send_message
+from src.version import get_version
 from src.models import (
     DialogInfo,
     ErrorCode,
@@ -31,12 +34,13 @@ from src.models import (
     SessionInfo,
     TgError,
     TgResult,
+    VersionInfo,
 )
 
 __all__ = [
     # factory
     "create_client",
-    # functions (F1–F8)
+    # functions (F1–F9)
     "get_dialogs",
     "read_messages",
     "send_message",
@@ -45,6 +49,7 @@ __all__ = [
     "download_media",
     "check_availability",
     "validate_session",
+    "get_version",
     # models
     "TgResult",
     "TgError",
@@ -54,4 +59,5 @@ __all__ = [
     "MediaResult",
     "SessionInfo",
     "ServiceStatus",
+    "VersionInfo",
 ]
