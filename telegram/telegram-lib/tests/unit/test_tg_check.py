@@ -23,7 +23,7 @@ sys.path.insert(0, str(_tools_dir))
 
 
 @pytest.mark.asyncio
-async def test_cmd_list_no_network_clean_output(capsys):
+async def test_cmd_list_clean_out(capsys):
     """cmd_list must print ONLY 'Error [NETWORK_ERROR]: ...' with no extra noise."""
     fake_creds = {"api_id": 12345, "api_hash": "abc", "session": "fake"}
 
@@ -58,7 +58,7 @@ async def test_cmd_list_no_network_clean_output(capsys):
 
 
 @pytest.mark.asyncio
-async def test_cmd_list_suppresses_telethon_logs(capsys):
+async def test_cmd_list_no_logs(capsys):
     """Telethon's 'Attempt N at connecting' log messages must be suppressed."""
     fake_creds = {"api_id": 12345, "api_hash": "abc", "session": "fake"}
 

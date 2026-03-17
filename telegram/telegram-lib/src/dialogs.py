@@ -37,8 +37,14 @@ async def get_dialogs(
         limit: Maximum number of dialogs to fetch. Defaults to 100.
 
     Returns:
-        ``TgResult`` whose payload is a list of ``DialogInfo`` objects,
-        or an error if the call fails (T6).
+        ``TgResult`` whose payload is a list of ``DialogInfo`` objects.
+
+    Possible errors (``TgResult.error``):
+        - ``NETWORK_ERROR`` — connection lost or timed out.
+        - ``RATE_LIMITED`` — Telegram flood-wait; ``retry_after`` is populated.
+        - ``SESSION_INVALID`` — session string is invalid or revoked.
+        - ``AUTH_FAILED`` — user account is deactivated or banned.
+        - ``INTERNAL_ERROR`` — unexpected / unmapped exception.
     """
     try:
         dialogs: list[DialogInfo] = []

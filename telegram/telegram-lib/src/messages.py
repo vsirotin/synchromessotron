@@ -69,6 +69,14 @@ async def read_messages(
 
     Returns:
         ``TgResult`` whose payload is a list of ``MessageInfo``.
+
+    Possible errors (``TgResult.error``):
+        - ``ENTITY_NOT_FOUND`` — dialog_id does not resolve to a known entity.
+        - ``NETWORK_ERROR`` — connection lost or timed out.
+        - ``RATE_LIMITED`` — Telegram flood-wait; ``retry_after`` is populated.
+        - ``SESSION_INVALID`` — session string is invalid or revoked.
+        - ``AUTH_FAILED`` — user account is deactivated or banned.
+        - ``INTERNAL_ERROR`` — unexpected / unmapped exception.
     """
     try:
         entity = await client.get_entity(dialog_id)
@@ -111,6 +119,14 @@ async def send_message(
 
     Returns:
         ``TgResult`` whose payload is the sent ``MessageInfo``.
+
+    Possible errors (``TgResult.error``):
+        - ``ENTITY_NOT_FOUND`` — dialog_id does not resolve to a known entity.
+        - ``PERMISSION_DENIED`` — user cannot write to this chat.
+        - ``NETWORK_ERROR`` — connection lost or timed out.
+        - ``RATE_LIMITED`` — Telegram flood-wait; ``retry_after`` is populated.
+        - ``SESSION_INVALID`` — session string is invalid or revoked.
+        - ``INTERNAL_ERROR`` — unexpected / unmapped exception.
     """
     try:
         entity = await client.get_entity(dialog_id)
@@ -147,6 +163,14 @@ async def edit_message(
 
     Returns:
         ``TgResult`` whose payload is the updated ``MessageInfo``.
+
+    Possible errors (``TgResult.error``):
+        - ``ENTITY_NOT_FOUND`` — dialog or message not found.
+        - ``NOT_MODIFIED`` — new text is identical to current text.
+        - ``PERMISSION_DENIED`` — user is not the author of the message.
+        - ``NETWORK_ERROR`` — connection lost or timed out.
+        - ``RATE_LIMITED`` — Telegram flood-wait; ``retry_after`` is populated.
+        - ``INTERNAL_ERROR`` — unexpected / unmapped exception.
     """
     try:
         entity = await client.get_entity(dialog_id)
@@ -179,6 +203,13 @@ async def delete_message(
 
     Returns:
         ``TgResult`` whose payload is the list of deleted message IDs.
+
+    Possible errors (``TgResult.error``):
+        - ``ENTITY_NOT_FOUND`` — dialog not found.
+        - ``PERMISSION_DENIED`` — user cannot delete these messages.
+        - ``NETWORK_ERROR`` — connection lost or timed out.
+        - ``RATE_LIMITED`` — Telegram flood-wait; ``retry_after`` is populated.
+        - ``INTERNAL_ERROR`` — unexpected / unmapped exception.
     """
     try:
         entity = await client.get_entity(dialog_id)

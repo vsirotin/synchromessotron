@@ -82,15 +82,17 @@ After completing development and unit-testing, perform these steps:
 
 a) **Update version** — Update the file `<project-root>/src/version.yaml` (if it exists). Use semantic versioning rules. Remember the new version.
 
-b) **Update release notes** — Update the file `<project-root>/release-notes.md` (if it exists) with the remembered version number and a short explanation of the version update.
+b) **Update release notes** — Append the new version entry **after** the existing content in `<project-root>/release-notes.md` (if it exists). Include the remembered version number and a short explanation of the version update. Do not reorder or overwrite previous entries.
 
 c) **Write commit text proposal** — Rewrite the content of `<project-root>/commit-text-proposal.txt` with the following format:
 
 ```
-<prefix>: Version: <current version>. <short label for update>.
+<prefix>: Project: <project>. Version: <current version>. <short label for update>.
 ```
 
-`<prefix>` is optional. Examples for using prefixes:
+`<prefix>` is optional. `<project>` is the sub-project path (e.g. `telegram/telegram-lib`). If one commit updates many sub-projects, write only about the main updated sub-project.
+
+Examples for using prefixes:
 
 | Prefix       | Meaning                                                        |
 |--------------|----------------------------------------------------------------|
@@ -107,7 +109,7 @@ c) **Write commit text proposal** — Rewrite the content of `<project-root>/com
 **Examples:**
 
 ```
-fix: Version 1.0.12. Closes #9, fix path issue
-nit: Version 1.3.12. Swap let for const
-doc: Version 2.3.15. Added usage section to README.md
+fix: Project: telegram/telegram-lib. Version 1.0.12. Closes #9, fix path issue.
+nit: Project: telegram/telegram-lib. Version 1.3.12. Swap let for const.
+doc: Project: telegram/telegram-lib. Version 2.3.15. Added usage section to README.md.
 ```

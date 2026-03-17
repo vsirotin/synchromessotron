@@ -31,6 +31,12 @@ async def check_availability(client: TelegramClient) -> TgResult[ServiceStatus]:
 
     Returns:
         ``TgResult`` whose payload is a ``ServiceStatus``.
+
+    Possible errors (``TgResult.error``):
+        - ``NETWORK_ERROR`` — Telegram is not reachable.
+        - ``SESSION_INVALID`` — session string is invalid or revoked.
+        - ``AUTH_FAILED`` — user account is deactivated or banned.
+        - ``INTERNAL_ERROR`` — unexpected / unmapped exception.
     """
     try:
         start = time.monotonic()
@@ -41,7 +47,6 @@ async def check_availability(client: TelegramClient) -> TgResult[ServiceStatus]:
         return TgResult(payload=ServiceStatus(available=True, latency_ms=round(latency, 1)))
     except ConnectionError as exc:
         return TgResult(
-            payload=ServiceStatus(available=False),
             error=TgError(ErrorCode.NETWORK_ERROR, str(exc)),
         )
     except Exception as exc:
@@ -62,7 +67,13 @@ async def validate_session(client: TelegramClient) -> TgResult[SessionInfo]:
 
     Returns:
         ``TgResult`` whose payload is a ``SessionInfo`` if the session is
-        valid, or a ``TgError`` with ``SESSION_INVALID`` otherwise.
+        valid.
+
+    Possible errors (``TgResult.error``):
+        - ``SESSION_INVALID`` — session is not authenticated or was revoked.
+        - ``NETWORK_ERROR`` — connection lost or timed out.
+        - ``AUTH_FAILED`` — user account is deactivated or banned.
+        - ``INTERNAL_ERROR`` — unexpected / unmapped exception.
     """
     try:
         me = await client.get_me()

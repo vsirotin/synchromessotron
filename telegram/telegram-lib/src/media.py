@@ -39,6 +39,13 @@ async def download_media(
     Returns:
         ``TgResult`` whose payload is a ``MediaResult`` with the local file
         path, MIME type, and size.
+
+    Possible errors (``TgResult.error``):
+        - ``ENTITY_NOT_FOUND`` — dialog, message, or media not found.
+        - ``INTERNAL_ERROR`` — download succeeded but returned no file path.
+        - ``NETWORK_ERROR`` — connection lost or timed out.
+        - ``RATE_LIMITED`` — Telegram flood-wait; ``retry_after`` is populated.
+        - ``SESSION_INVALID`` — session string is invalid or revoked.
     """
     try:
         entity = await client.get_entity(dialog_id)

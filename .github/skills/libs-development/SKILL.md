@@ -9,6 +9,7 @@ metadata:
 # Library Development Skill
 
 > **Prerequisite:** Always apply the [common-development](../common-development/SKILL.md) rules in addition to the rules below.
+> The common-development skill is located at `.github/skills/common-development/SKILL.md`.
 
 ## When to apply which rules
 
