@@ -55,3 +55,4 @@ TMP/
 .github/agents/lang-tutor.agent.md
 .github/hooks/log-prompts.json
 telegram/telegram-lib/commit-text-proposal.txt
+telegram/telegram-cli/commit-text-proposal.txt
