@@ -1,27 +1,81 @@
 # telegram-cli
 
-Command-line interface for Telegram — backup dialogs, send/edit/delete messages, download media, and check connectivity from the terminal.
+Telegram is one of the most widely used messengers in the world, with over 900 million monthly active users across dozens of languages and countries.
+
+| Language | ISO 639‑1 | Top Countries | Estimated Telegram Users |
+|----------|-----------|---------------|--------------------------|
+| Russian | ru | Russia, Ukraine, Belarus | ≈ 120–150 million |
+| English | en | India, USA, UK | ≈ 110–130 million |
+| Persian (Farsi) | fa | Iran, Afghanistan, Tajikistan | ≈ 40–50 million |
+| Turkish | tr | Turkey, Cyprus, Germany (diaspora) | ≈ 25–35 million |
+| Arabic | ar | Egypt, Iraq, Saudi Arabia | ≈ 20–30 million |
+| German | de | Germany, Austria, Switzerland | ≈ 8–12 million |
+
+Telegram can sometimes be unavailable or blocked in certain countries or geographical regions. In these cases, telegram-cli can help — it allows you to work with your Telegram data from the command line, independently of the official apps.
+
+It is especially useful for **offline processing** of Telegram content — for example, backing up conversations, groups, and channels for later analysis with AI tools or other automation.
+
+You do not need to be a programmer to use this tool. Just follow the steps below.
 
 ## Overview
 
 | Command | What it does |
 |---------|-------------|
+| `init` | Set up credentials and session |
+| `whoami` | Validate session and show user info |
+| `ping` | Check Telegram availability |
+| `get-dialogs` | List the user's dialogs |
 | `backup` | Full or incremental message backup |
 | `send` | Send a message to a dialog |
 | `edit` | Edit a previously sent message |
 | `delete` | Delete own messages |
-| `get-dialogs` | List the user's dialogs |
 | `download-media` | Download a media file from a message |
-| `ping` | Check Telegram availability |
-| `whoami` | Validate session and show user info |
+| `help` | Show help in your language |
+| `howlong` | Estimate duration of a long-running command |
+| `version` | Show version information |
 
-> **Terminology:** In the Telegram API the term **"dialog"** denotes any conversation the user participates in — a one-to-one chat with another user, a group, or a channel.
+> **What is a "dialog"?** In Telegram, a "dialog" means any conversation — a private chat with a person, a group, or a channel.
 
 ---
 
-## Getting Started
+## How to Install
 
-### Step 1 — Create a Telegram application
+### Step 1 — Check or install Python
+
+telegram-cli requires **Python 3.11 or newer**. Open a terminal (or Command Prompt on Windows) and check your version:
+
+```
+python3 --version
+```
+
+On Windows, try `python --version` if `python3` is not recognised.
+
+**If Python is not installed or the version is too old:**
+
+| Platform | How to install |
+|----------|---------------|
+| **Windows** | Download the installer from <https://www.python.org/downloads/> . Run it and **check the box "Add Python to PATH"** during installation. |
+| **macOS** | Install via [Homebrew](https://brew.sh/): `brew install python@3.11` . Or download from <https://www.python.org/downloads/> . |
+| **Linux (Debian/Ubuntu)** | `sudo apt update && sudo apt install python3` |
+| **Linux (Fedora)** | `sudo dnf install python3` |
+
+After installation, verify:
+
+```
+python3 --version
+```
+
+You should see `Python 3.11.x` or newer.
+
+### Step 2 — Download telegram-cli
+
+Download the file `telegram-cli.pyz` from the [latest release](../../releases/latest) page. Put it in a folder of your choice — for example, a `telegram-cli` folder on your Desktop or in your home directory.
+
+This single file contains everything the tool needs. No additional installation is required.
+
+### Step 3 — Create a Telegram application
+
+To use telegram-cli you need your own Telegram API credentials. This is a one-time setup.
 
 1. Open <https://my.telegram.org/apps> in a browser and sign in with your phone number.
 2. Click **API development tools**.
@@ -30,77 +84,39 @@ Command-line interface for Telegram — backup dialogs, send/edit/delete message
    ![Create new application dialog](docs/images/telegram1.png)
 
 4. Click **Create application**.
-5. You will see your **App api_id** (a number) and **App api_hash** (a long hex string). Note both values — you will need them in the next step.
+5. You will see your **App api_id** (a number) and **App api_hash** (a long hex string). Keep this page open — you will need both values in the next step.
 
    ![api_id and api_hash](docs/images/telegram2.png)
 
-### Step 2 — Create the credentials file
+### Step 4 — Set up your session
 
-Your credentials are stored in a local file `.env.telegram` which is **excluded from version control** (listed in `.gitignore`). It will never be committed.
+Open a terminal, navigate to the folder where you placed `telegram-cli.pyz`, and run:
 
-Copy the example file and fill in your real values:
-
-```bash
-cp .env.telegram.example .env.telegram
+```
+python3 telegram-cli.pyz init
 ```
 
-Open `.env.telegram` in your editor and set your values:
+On Windows, use `python` instead of `python3`.
 
-```dotenv
-TG_API_ID=12345
-TG_API_HASH=your_api_hash_here
-TG_PHONE=+1234567890
-TG_SESSION=
-```
-
-Replace `12345` with your real api_id, `your_api_hash_here` with your real api_hash, and `+1234567890` with your Telegram phone number (with country code). Leave `TG_SESSION` empty for now.
-
-> **Security:** The `.env.telegram` file is matched by the `.env.*` pattern in `.gitignore` and will never be committed. Never share this file.
-
-### Step 3 — Generate a session string
-
-Run the session generation script:
-
-```bash
-python3 tools/generate_session.py
-```
-
-The script reads your `api_id`, `api_hash`, and phone number from `.env.telegram`, then:
-
-1. Sends a confirmation code to your Telegram app — type it when prompted.
-2. If you have Two-Step Verification enabled, asks for your **2FA password**.
+The command will:
+1. Ask for your **api_id**, **api_hash**, and **phone number** (from Step 3).
+2. Send a login code to your Telegram app — type it when prompted.
+3. If you have Two-Step Verification enabled, ask for your **2FA password**.
+4. Create a `config.yaml` file with your credentials and session.
 
 > **What is the 2FA password?** It is a password *you chose yourself* when you enabled Two-Step Verification in Telegram. To check or change it: open Telegram → **Settings → Privacy and Security → Two-Step Verification**.
 
-The script prints a session string. Copy it and add it to your `.env.telegram` file:
+**Expected result:**
 
-```dotenv
-TG_SESSION=your_generated_session_string_here
+```
+✓ Session created and saved to config.yaml
+  Run 'python3 telegram-cli.pyz whoami' to verify.
 ```
 
-**Treat the session string like a password.**
+### Step 5 — Verify the setup
 
-### Step 4 — Install telegram-cli
-
-```bash
-cd synchromessotron/telegram/telegram-cli
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
 ```
-
-### Step 5 — Run unit tests
-
-```bash
-pytest tests/unit/
-```
-
-All tests should pass. No credentials or network needed.
-
-### Step 6 — Verify the setup
-
-```bash
-telegram-cli whoami
+python3 telegram-cli.pyz whoami
 ```
 
 **Expected result:**
@@ -113,16 +129,10 @@ telegram-cli whoami
   Phone:     +1234567890
 ```
 
-**What can go wrong:**
+Possible errors: `AUTH_FAILED`, `NETWORK_ERROR`, `SESSION_INVALID`. See [Error Handling](#error-handling) below.
 
-| Output | Cause | What to do |
-|--------|-------|------------|
-| `Error [SESSION_INVALID]: Session is invalid or revoked` | Session string is wrong, expired, or was revoked from another device. | Re-run `python3 tools/generate_session.py` and update `TG_SESSION` in `.env.telegram`. |
-| `Error [AUTH_FAILED]: User account is deactivated or banned` | Telegram account is suspended. | Contact Telegram support. |
-| `Error [NETWORK_ERROR]: ...` | No internet connection or Telegram is blocked. | Check your network; try again later. |
-
-```bash
-telegram-cli ping
+```
+python3 telegram-cli.pyz ping
 ```
 
 **Expected result:**
@@ -131,28 +141,201 @@ telegram-cli ping
 ✓ Telegram is reachable (42.3 ms)
 ```
 
-**What can go wrong:**
+---
 
-| Output | Cause | What to do |
-|--------|-------|------------|
-| `Error [NETWORK_ERROR]: ...` | Device is offline or Telegram is blocked in your region. | Check your internet connection or try a VPN. |
+## Security — Protecting Your Credentials
+
+The `config.yaml` file contains sensitive data: your Telegram API credentials and session string. **Anyone who has this file can access your Telegram account.**
+
+**Rules:**
+
+1. **Never share `config.yaml` with anyone.** It is like a password.
+2. **Never upload it to the internet** — do not put it on GitHub, Google Drive, Dropbox, email, or any public/shared location.
+3. **Keep it only in the same folder as `telegram-cli.pyz`** on your own computer.
+4. **If you suspect compromise** — if someone may have seen or copied your `config.yaml` — immediately revoke the session in Telegram: go to **Settings → Devices** (or **Settings → Privacy and Security → Active Sessions**) and terminate the suspect session. Then re-run `python3 telegram-cli.pyz init` to create a new one.
+
+> The file `config.yaml.example` is a template with no real credentials — it is safe to share or commit.
+
+---
+
+## Output Directory
+
+All data produced by telegram-cli (backups, downloaded media) is stored in a structured **output directory**.
+
+### Location
+
+By default, the output directory is created in the folder where you run `telegram-cli.pyz`:
+
+```
+<current folder>/synchromessotron/
+```
+
+You can override it with `--outdir`:
+
+```
+python3 telegram-cli.pyz backup -1001234567890 --outdir=/path/to/my/data
+```
+
+or set it permanently in `config.yaml`:
+
+```yaml
+telegram:
+  output_dir: "/path/to/my/data"
+  split_threshold: 50
+```
+
+> **Conflict rule:** If both `--outdir` and `output_dir` in `config.yaml` are set and they point to different paths, the command exits with an error. Remove one of them to resolve the conflict.
+
+### Write permissions
+
+Before writing any data, telegram-cli checks that the output directory can be created and written to. If the check fails, the command prints an error and exits.
+
+**macOS / Linux:**
+
+The user running `telegram-cli.pyz` must have write permission to the parent folder. To check:
+
+```
+ls -ld /path/to/parent/folder
+```
+
+If you see `drwx------` or similar with `w` in the owner permissions, you are fine. To grant write permission:
+
+```
+chmod u+w /path/to/parent/folder
+```
+
+Most home-directory locations (Desktop, Documents, home folder) already have write permission.
+
+**Windows:**
+
+Right-click the target folder → **Properties** → **Security** tab → check that your user has **Write** permission. If not, click **Edit**, select your user, and check the **Write** box.
+
+Alternatively, in Command Prompt:
+
+```
+icacls "C:\path\to\folder"
+```
+
+Look for `(W)` or `(F)` next to your username. If write permission is missing:
+
+```
+icacls "C:\path\to\folder" /grant %USERNAME%:W
+```
+
+### Dialog sub-directories
+
+For each dialog, a sub-directory is created using this naming convention:
+
+```
+<first 10 characters of name>_<absolute value of ID>
+```
+
+- Spaces in the name are replaced with underscores (`_`).
+- If the name is shorter than 10 characters, the full name is used.
+
+| Dialog | Sub-directory |
+|--------|---------------|
+| `Chat  -718738386  Мемуары кочевого программиста. Байки, были, думы` | `Мемуары_ко_718738386` |
+| `User  777000  Telegram` | `Telegram_777000` |
+
+### Time-based hierarchy
+
+Inside each dialog directory, messages are organized by time. The depth of the hierarchy depends on the volume of messages.
+
+The rule is controlled by `split_threshold` in `config.yaml` (default: `50`):
+
+- A **year** directory is always created (e.g. `2025/`, `2026/`).
+- If a year contains more than `split_threshold` messages → sub-directories for **months** (`01/` … `12/`).
+- If a month exceeds the threshold → sub-directories for **days** (`01/` … `31/`).
+- If a day exceeds the threshold → sub-directories for **hours** (`00/` … `23/`).
+- If an hour exceeds the threshold → sub-directories for **minutes** (`00/` … `59/`).
+
+This rule is applied recursively. Messages are always stored at the deepest (leaf) level.
+
+### Message files
+
+At each leaf level, two files are created:
+
+| File | Format | Content |
+|------|--------|---------|
+| `messages.json` | JSON | All known message attributes (full data for machine processing). |
+| `messages.md` | Markdown | Message author, timestamp, and text only (human-readable). |
+
+### Content flags
+
+By default, only **messages** are backed up (`messages.json` + `messages.md`). To include additional content, add the corresponding flags:
+
+| Flag | Content saved |
+|------|---------------|
+| `--media` | Photos and videos (saved to `media/` sub-directories) |
+| `--files` | Documents and other file attachments (saved to `files/`) |
+| `--music` | Audio tracks (saved to `music/`) |
+| `--voice` | Voice messages (saved to `voice/`) |
+| `--links` | Link previews and URLs (saved to `links/`) |
+| `--gifs` | GIF animations (saved to `gifs/`) |
+| `--members` | Dialog participants (saved to `members/` in the dialog root) |
+
+Each content sub-directory follows the same time-based splitting rule as messages.
+
+Example — backup messages and photos:
+
+```
+python3 telegram-cli.pyz backup -1001234567890 --media
+```
+
+Example — backup everything:
+
+```
+python3 telegram-cli.pyz backup -1001234567890 --media --files --music --voice --links --gifs --members
+```
+
+### Example
+
+Assuming `backup` was run with `--media --members`:
+
+```
+synchromessotron/
+├── Мемуары_ко_718738386/
+│   ├── members/
+│   ├── 2025/
+│   │   ├── 01/
+│   │   │   ├── messages.json
+│   │   │   ├── messages.md
+│   │   │   └── media/
+│   │   └── 02/
+│   │       ├── messages.json
+│   │       └── messages.md
+│   └── 2026/
+│       ├── messages.json
+│       └── messages.md
+└── Telegram_777000/
+    └── 2026/
+        ├── messages.json
+        └── messages.md
+```
+
+In this example:
+- The dialog "Мемуары кочевого…" had more than 50 messages in 2025, so it was split into months. In 2026 there were 50 or fewer, so they stay directly in the year directory.
+- "Telegram" had few messages overall — no monthly split needed.
 
 ---
 
 ## Command Reference
 
+> In all examples below, replace `python3` with `python` on Windows if needed.
+
 ### get-dialogs — List dialogs
 
-```bash
-telegram-cli get-dialogs [--limit=N] [--output=FILE]
+```
+python3 telegram-cli.pyz get-dialogs [--limit=N] [--outdir=DIR]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--limit` | all | Maximum number of dialogs to return. |
-| `--output` | stdout | Write JSON to this file instead of printing a table. |
+| `--outdir` | — | Save `dialogs.json` to this directory (see [Output Directory](#output-directory)). |
 
-**Expected result:**
+**Expected result** (to terminal):
 
 ```
   TYPE         ID                 NAME
@@ -164,70 +347,79 @@ telegram-cli get-dialogs [--limit=N] [--output=FILE]
 3 dialogs found.
 ```
 
-With `--output=dialogs.json`, no table is printed; the JSON file is written silently.
+With `--outdir`, the table is still printed and `dialogs.json` is saved to the output directory root.
 
-**What can go wrong:**
-
-| Output | Cause | What to do |
-|--------|-------|------------|
-| `Error [SESSION_INVALID]: ...` | Session expired. | Re-generate the session (Step 3). |
-| `Error [NETWORK_ERROR]: ...` | No connection. | Check your internet. |
-| `Error [RATE_LIMITED]: ... retry after Ns` | Too many requests. | Wait N seconds and try again. |
+Possible errors: `NETWORK_ERROR`, `PERMISSION_DENIED`, `RATE_LIMITED`, `SESSION_INVALID`. See [Error Handling](#error-handling) below.
 
 ---
 
 ### backup — Backup messages
 
-```bash
-telegram-cli backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--output=FILE]
+```
+python3 telegram-cli.pyz backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--outdir=DIR] [--media] [--files] [--music] [--voice] [--links] [--gifs] [--members]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--since` | — | ISO 8601 timestamp; only messages after it are returned (incremental). |
 | `--limit` | 100 | Maximum number of messages. |
-| `--output` | stdout | Write JSON to this file. |
+| `--outdir` | `./synchromessotron` | Root output directory (see [Output Directory](#output-directory)). |
+| `--media` | off | Also download photos and videos. |
+| `--files` | off | Also download documents and file attachments. |
+| `--music` | off | Also download audio tracks. |
+| `--voice` | off | Also download voice messages. |
+| `--links` | off | Also save link previews and URLs. |
+| `--gifs` | off | Also download GIF animations. |
+| `--members` | off | Also save dialog participant list. |
 
-**Expected result** (full backup):
+By default, only messages are saved (`messages.json` + `messages.md`). Add content flags to include additional data.
 
-```bash
-telegram-cli backup -1001234567890 --limit=500 --output=backup.json
+**Expected result** (messages only):
+
+```
+python3 telegram-cli.pyz backup -1001234567890 --limit=500
 ```
 
 ```
-✓ 500 messages saved to backup.json
+✓ 500 messages saved to synchromessotron/Telegram_777000/2026/
+```
+
+**Expected result** (with media):
+
+```
+python3 telegram-cli.pyz backup -1001234567890 --limit=500 --media --files
+```
+
+```
+✓ 500 messages saved to synchromessotron/Telegram_777000/2026/
+✓ 23 media files downloaded
+✓ 7 documents downloaded
 ```
 
 **Expected result** (incremental):
 
-```bash
-telegram-cli backup -1001234567890 --since="2026-03-01T00:00:00" --output=incremental.json
+```
+python3 telegram-cli.pyz backup -1001234567890 --since="2026-03-01T00:00:00"
 ```
 
 ```
-✓ 12 messages saved to incremental.json
+✓ 12 messages saved to synchromessotron/Telegram_777000/2026/03/
 ```
 
-**What can go wrong:**
-
-| Output | Cause | What to do |
-|--------|-------|------------|
-| `Error [ENTITY_NOT_FOUND]: ...` | The dialog ID does not exist or you have no access. | Run `get-dialogs` to find the correct ID. |
-| `Error [RATE_LIMITED]: ... retry after Ns` | Too many requests in a short time. | Wait N seconds and retry. |
-| `Error [NETWORK_ERROR]: ...` | Connection lost during backup. | Check network, then retry. |
+Possible errors: `ENTITY_NOT_FOUND`, `NETWORK_ERROR`, `PERMISSION_DENIED`, `RATE_LIMITED`. See [Error Handling](#error-handling) below.
 
 ---
 
 ### send — Send a message
 
-```bash
-telegram-cli send <dialog_id> --text=TEXT
+```
+python3 telegram-cli.pyz send <dialog_id> --text=TEXT
 ```
 
 **Expected result:**
 
-```bash
-telegram-cli send -1001234567890 --text="Hello from CLI!"
+```
+python3 telegram-cli.pyz send -1001234567890 --text="Hello from CLI!"
 ```
 
 ```
@@ -237,26 +429,20 @@ telegram-cli send -1001234567890 --text="Hello from CLI!"
   Text:  Hello from CLI!
 ```
 
-**What can go wrong:**
-
-| Output | Cause | What to do |
-|--------|-------|------------|
-| `Error [ENTITY_NOT_FOUND]: ...` | Dialog ID does not exist. | Check the ID with `get-dialogs`. |
-| `Error [PERMISSION_DENIED]: ...` | You cannot write to this channel/group. | Verify your permissions in the dialog. |
-| `Error [RATE_LIMITED]: ... retry after Ns` | Sending too fast. | Wait N seconds. |
+Possible errors: `ENTITY_NOT_FOUND`, `PERMISSION_DENIED`, `RATE_LIMITED`. See [Error Handling](#error-handling) below.
 
 ---
 
 ### edit — Edit a message
 
-```bash
-telegram-cli edit <dialog_id> <message_id> --text=TEXT
+```
+python3 telegram-cli.pyz edit <dialog_id> <message_id> --text=TEXT
 ```
 
 **Expected result:**
 
-```bash
-telegram-cli edit -1001234567890 42 --text="Corrected text"
+```
+python3 telegram-cli.pyz edit -1001234567890 42 --text="Corrected text"
 ```
 
 ```
@@ -266,74 +452,60 @@ telegram-cli edit -1001234567890 42 --text="Corrected text"
   Text:  Corrected text
 ```
 
-**What can go wrong:**
-
-| Output | Cause | What to do |
-|--------|-------|------------|
-| `Error [ENTITY_NOT_FOUND]: ...` | Dialog or message ID does not exist. | Verify both IDs. |
-| `Error [PERMISSION_DENIED]: ...` | The message was sent by another user. | You can only edit your own messages. |
-| `Error [NOT_MODIFIED]: ...` | New text is identical to the current text. | Provide different text. |
+Possible errors: `ENTITY_NOT_FOUND`, `NOT_MODIFIED`, `PERMISSION_DENIED`. See [Error Handling](#error-handling) below.
 
 ---
 
 ### delete — Delete messages
 
-```bash
-telegram-cli delete <dialog_id> <message_id> [<message_id> ...]
+```
+python3 telegram-cli.pyz delete <dialog_id> <message_id> [<message_id> ...]
 ```
 
 **Expected result:**
 
-```bash
-telegram-cli delete -1001234567890 42 43 44
+```
+python3 telegram-cli.pyz delete -1001234567890 42 43 44
 ```
 
 ```
 ✓ 3 messages deleted
 ```
 
-**What can go wrong:**
-
-| Output | Cause | What to do |
-|--------|-------|------------|
-| `Error [ENTITY_NOT_FOUND]: ...` | Dialog or message ID does not exist. | Verify the IDs. |
-| `Error [PERMISSION_DENIED]: ...` | You cannot delete these messages. | You can only delete your own messages. |
+Possible errors: `ENTITY_NOT_FOUND`, `PERMISSION_DENIED`. See [Error Handling](#error-handling) below.
 
 ---
 
 ### download-media — Download media
 
-```bash
-telegram-cli download-media <dialog_id> <message_id> [--dest=DIR]
+```
+python3 telegram-cli.pyz download-media <dialog_id> <message_id> [--outdir=DIR]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--dest` | `.` (current directory) | Target directory for the downloaded file. |
+| `--outdir` | `./synchromessotron` | Root output directory (see [Output Directory](#output-directory)). |
+
+The file is saved into the appropriate content sub-directory (`media/`, `files/`, `music/`, `voice/`, `gifs/`) inside the dialog's time-based hierarchy.
 
 **Expected result:**
 
-```bash
-telegram-cli download-media -1001234567890 42 --dest=./downloads
+```
+python3 telegram-cli.pyz download-media -1001234567890 42
 ```
 
 ```
-✓ Downloaded: ./downloads/photo_42.jpg (2.1 MB)
+✓ Downloaded: synchromessotron/Telegram_777000/2026/03/media/photo_42.jpg (2.1 MB)
 ```
 
-**What can go wrong:**
-
-| Output | Cause | What to do |
-|--------|-------|------------|
-| `Error [ENTITY_NOT_FOUND]: ...` | Dialog, message, or media not found. The message may have no media attached. | Verify the IDs; check that the message contains media. |
-| `Error [NETWORK_ERROR]: ...` | Download interrupted. | Check your connection and retry. |
+Possible errors: `ENTITY_NOT_FOUND`, `NETWORK_ERROR`, `PERMISSION_DENIED`. See [Error Handling](#error-handling) below.
 
 ---
 
 ### ping — Check availability
 
-```bash
-telegram-cli ping
+```
+python3 telegram-cli.pyz ping
 ```
 
 **Expected result:**
@@ -342,18 +514,14 @@ telegram-cli ping
 ✓ Telegram is reachable (42.3 ms)
 ```
 
-**What can go wrong:**
-
-| Output | Cause | What to do |
-|--------|-------|------------|
-| `Error [NETWORK_ERROR]: ...` | No internet or Telegram is blocked. | Check your connection or try a VPN. |
+Possible errors: `NETWORK_ERROR`. See [Error Handling](#error-handling) below.
 
 ---
 
 ### whoami — Validate session
 
-```bash
-telegram-cli whoami
+```
+python3 telegram-cli.pyz whoami
 ```
 
 **Expected result:**
@@ -366,12 +534,107 @@ telegram-cli whoami
   Phone:     +1234567890
 ```
 
-**What can go wrong:**
+Possible errors: `AUTH_FAILED`, `SESSION_INVALID`. See [Error Handling](#error-handling) below.
 
-| Output | Cause | What to do |
-|--------|-------|------------|
-| `Error [SESSION_INVALID]: ...` | Session expired or revoked. | Re-generate the session (Step 3). |
-| `Error [AUTH_FAILED]: ...` | Account deactivated or banned. | Contact Telegram support. |
+---
+
+### help — Show help in your language
+
+```
+python3 telegram-cli.pyz help [LANG] [COMMAND]
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `LANG` | `en` | ISO 639-1 language code. Supported: `en`, `ru`, `fa`, `tr`, `ar`, `de`. |
+| `COMMAND` | — | If given, show detailed help for that specific command. |
+
+**Examples:**
+
+```
+# General help in English (default)
+python3 telegram-cli.pyz help
+
+# General help in German
+python3 telegram-cli.pyz help de
+
+# Detailed help for the backup command in Russian
+python3 telegram-cli.pyz help ru backup
+```
+
+**Expected result** (general, English):
+
+```
+telegram-cli — command-line tool for Telegram
+
+Commands:
+  init            Set up credentials and session
+  whoami          Validate session and show user info
+  ping            Check Telegram availability
+  get-dialogs     List your dialogs
+  backup          Full or incremental message backup
+  send            Send a message
+  edit            Edit a previously sent message
+  delete          Delete own messages
+  download-media  Download media from a message
+  help            Show this help
+  howlong         Estimate duration of a command
+  version         Show version information
+
+Run 'telegram-cli help <lang> <command>' for details.
+```
+
+---
+
+### howlong — Estimate duration of a long-running command
+
+Some commands (e.g. `backup`, `download-media`) may take a long time depending on the amount of data. Use `howlong` to get an estimate before running them.
+
+```
+python3 telegram-cli.pyz howlong <command> [ARGS...]
+```
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `command` | yes | The command to estimate (`backup`, `download-media`, `get-dialogs`). |
+| `ARGS` | no | The same arguments you would pass to the actual command. |
+
+**Examples:**
+
+```
+# How long would a full backup of 5000 messages take?
+python3 telegram-cli.pyz howlong backup -1001234567890 --limit=5000
+
+# How long to download a media file?
+python3 telegram-cli.pyz howlong download-media -1001234567890 42
+```
+
+**Expected result:**
+
+```
+≈ 12 minutes (5000 messages, estimated 2.4 ms per message)
+```
+
+The estimate is approximate — actual time depends on network speed and Telegram rate limits.
+
+Possible errors: `NETWORK_ERROR`, unsupported command. See [Error Handling](#error-handling) below.
+
+---
+
+### version — Show version information
+
+```
+python3 telegram-cli.pyz version
+```
+
+**Expected result:**
+
+```json
+{
+  "cli": { "version": "1.0.0", "build": 1, "datetime": "2026-03-17T00:00:00Z" },
+  "lib": { "version": "1.2.0", "build": 3, "datetime": "2026-03-18T00:00:00Z" }
+}
+```
 
 ---
 
@@ -385,8 +648,8 @@ This test verifies that telegram-cli reports a clear error when Telegram is unre
 
 **Steps:**
 
-```bash
-telegram-cli ping
+```
+python3 telegram-cli.pyz ping
 ```
 
 **Expected result:**
@@ -397,8 +660,8 @@ Error [NETWORK_ERROR]: Cannot reach Telegram
 
 Exit code: `2`.
 
-```bash
-telegram-cli get-dialogs
+```
+python3 telegram-cli.pyz get-dialogs
 ```
 
 **Expected result:**
@@ -426,14 +689,14 @@ Error [RATE_LIMITED]: Too many requests — retry after 30s
 
 | Code | Meaning | Action |
 |------|---------|--------|
-| `RATE_LIMITED` | Too many requests. | Wait the number of seconds shown in `retry_after`, then retry. |
 | `AUTH_FAILED` | Account deactivated or banned. | Contact Telegram support. |
-| `SESSION_INVALID` | Session expired or revoked. | Re-generate the session (Step 3). |
 | `ENTITY_NOT_FOUND` | Dialog or message ID does not exist. | Verify the ID with `get-dialogs`. |
-| `PERMISSION_DENIED` | No permission (e.g. read-only channel, not your message). | Check your rights in the dialog. |
-| `NOT_MODIFIED` | Edit text is identical to current text. | Provide different text. |
-| `NETWORK_ERROR` | Cannot reach Telegram. | Check your internet connection. |
 | `INTERNAL_ERROR` | Unexpected failure. | Report the issue with the error details. |
+| `NETWORK_ERROR` | Cannot reach Telegram. | Check your internet connection. |
+| `NOT_MODIFIED` | Edit text is identical to current text. | Provide different text. |
+| `PERMISSION_DENIED` | No permission (e.g. read-only channel, not your message). | Check your rights in the dialog. |
+| `RATE_LIMITED` | Too many requests. | Wait the number of seconds shown in `retry_after`, then retry. |
+| `SESSION_INVALID` | Session expired or revoked. | Re-run `python3 telegram-cli.pyz init`. |
 
 ## Exit Codes
 
@@ -446,5 +709,5 @@ Error [RATE_LIMITED]: Too many requests — retry after 30s
 ## Output Formats
 
 - **Terminal (TTY):** human-readable tables and status messages.
-- **File (`--output`):** JSON for machine-readable processing.
+- **Output directory (`--outdir`):** structured directory tree with `messages.json` (full data) and `messages.md` (human-readable) at each level. See [Output Directory](#output-directory).
 - **Piped stdout (non-TTY):** JSON, suitable for chaining with `jq` or other tools.

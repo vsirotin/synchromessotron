@@ -4,7 +4,9 @@ This document describes the functional and technical requirements for telegram-c
 
 ## Structural Requirements
 
-Telegram-cli is a standalone command-line application. It loads credentials from the `.env.telegram` file, communicates with the Telegram API, and formats output for the terminal or file. The user interacts only with CLI commands and does not need to know about internal implementation details.
+Telegram-cli is a standalone command-line application delivered as a single executable file (`telegram-cli.pyz`). It is packaged with [shiv](https://github.com/linkedin/shiv) so that all Python dependencies (including telegram-lib) are bundled inside. The user only needs a compatible Python installation (≥ 3.11) — no `pip install`, no virtual environments.
+
+The tool reads credentials from a `config.yaml` file located next to the executable. The user interacts only with CLI commands and does not need to know about internal implementation details.
 
 ## Error Handling
 
@@ -404,11 +406,296 @@ telegram-cli version
 
 ---
 
+### F10 — Initialize configuration (session setup)
+
+Interactively create or update the `config.yaml` file by generating a Telegram session string.
+
+**Signature:**
+
+```
+telegram-cli init
+```
+
+**Arguments:** None.
+
+**Behaviour:**
+
+1. If `config.yaml` does not exist, the command asks the user for `api_id`, `api_hash`, and `phone`, then writes a new `config.yaml`.
+2. If `config.yaml` already exists, the command reads `api_id`, `api_hash`, and `phone` from it.
+3. Connects to Telegram and sends a login code to the user's Telegram app.
+4. Prompts the user to enter the code.
+5. If Two-Step Verification (2FA) is enabled, prompts for the 2FA password.
+6. Writes the generated session string into `config.yaml` (field `telegram.session`).
+
+**Examples:**
+
+```bash
+python3 telegram-cli.pyz init
+```
+
+**Output (success):**
+
+```
+✓ Session created and saved to config.yaml
+  Run 'python3 telegram-cli.pyz whoami' to verify.
+```
+
+**Possible errors:**
+
+| Error code | When it happens |
+|------------|-----------------|
+| `AUTH_FAILED` | Account is deactivated or banned. |
+| `NETWORK_ERROR` | Cannot connect to Telegram. |
+| `INTERNAL_ERROR` | Cannot write config.yaml (permissions, disk full, etc.). |
+
+---
+
+### F11 — Multilingual help
+
+Display help text in one of the supported languages.
+
+**Signature:**
+
+```
+telegram-cli help [LANG] [COMMAND]
+```
+
+**Arguments:**
+
+| Argument | Required | Type | Description |
+|----------|----------|------|-------------|
+| `LANG` | no | ISO 639-1 code | Language for the help text. Supported: `en` (default), `ru`, `fa`, `tr`, `ar`, `de`. |
+| `COMMAND` | no | string | If given, show detailed help for that specific command only. |
+
+**Supported languages:**
+
+| Language | Code |
+|----------|------|
+| English | `en` |
+| Russian | `ru` |
+| Persian (Farsi) | `fa` |
+| Turkish | `tr` |
+| Arabic | `ar` |
+| German | `de` |
+
+**Examples:**
+
+```bash
+# General help in English (default)
+telegram-cli help
+
+# General help in German
+telegram-cli help de
+
+# Detailed help for the backup command in Russian
+telegram-cli help ru backup
+```
+
+**Output:** Human-readable help text in the requested language. Contains a list of all commands with short descriptions (general mode) or detailed usage for a single command (command mode).
+
+**Possible errors:**
+
+| Error code | When it happens |
+|------------|------------------|
+| `INTERNAL_ERROR` | Requested language file is missing or corrupted. |
+
+> If an unsupported language code is given, the command falls back to English and prints a notice.
+
+---
+
+### F12 — Estimate duration of long-running commands
+
+Provide an approximate time estimate for potentially long-running commands before the user commits to running them.
+
+**Signature:**
+
+```
+telegram-cli howlong <command> [ARGS...]
+```
+
+**Arguments:**
+
+| Argument | Required | Type | Description |
+|----------|----------|------|-------------|
+| `command` | yes | string | The command to estimate. Supported: `backup`, `download-media`, `get-dialogs`. |
+| `ARGS` | no | mixed | The same arguments that would be passed to the actual command (e.g. `<dialog_id> --limit=5000`). Used to refine the estimate. |
+
+**Examples:**
+
+```bash
+telegram-cli howlong backup -1001234567890 --limit=5000
+telegram-cli howlong download-media -1001234567890 42
+telegram-cli howlong get-dialogs
+```
+
+**Output (success):** A human-readable estimate, e.g.:
+
+```
+≈ 12 minutes (5000 messages, estimated 2.4 ms per message)
+```
+
+**Estimation method:** The command may connect to Telegram briefly to determine the data volume (e.g. total number of messages in a dialog) and then calculate the estimate based on known per-item processing time and Telegram rate limits.
+
+**Possible errors:**
+
+| Error code | When it happens |
+|------------|------------------|
+| `INTERNAL_ERROR` | The specified command does not support time estimation (e.g. `send`, `edit`). |
+| `ENTITY_NOT_FOUND` | The dialog ID does not exist. |
+| `NETWORK_ERROR` | Cannot connect to determine data volume. |
+| `SESSION_INVALID` | Session has expired. |
+
+---
+
 ## Technical Requirements
 
-- T1. Credentials are loaded from the `.env.telegram` file using `python-dotenv`.
+- T1. Credentials (api_id, api_hash, phone, session) are loaded from a `config.yaml` file located in the same directory as the executable. The file uses YAML format with a flat `telegram` section.
 - T2. The CLI uses Python's `argparse` module for argument parsing.
-- T3. All output uses two formats: human-readable tables/text to stdout (when connected to a TTY), and JSON when `--output` is specified or when stdout is piped (not a TTY).
+- T3. All output uses two formats: human-readable tables/text to stdout (when connected to a TTY), and structured files in the output directory when `--outdir` is specified. When stdout is piped (not a TTY), output is JSON.
 - T4. When an error occurs, the tool prints a structured error message to stderr and exits with the appropriate exit code.
-- T5. The CLI is a single-file script (`telegram-cli.py`) for simplicity. It may be split into modules if complexity grows.
+- T5. The CLI is packaged as a single `.pyz` file using [shiv](https://github.com/linkedin/shiv). All Python dependencies (telegram-lib, Telethon, python-dotenv, PyYAML, etc.) are bundled inside. The user invokes it via `python3 telegram-cli.pyz <command>`.
 - T6. Unit tests mock internal API calls and verify argument parsing, output formatting, and error handling.
+- T7. The CLI includes a built-in `init` command that interactively generates a session string and writes it to `config.yaml`, so users do not need separate tooling.
+- T8. The CLI requires Python ≥ 3.11. The `init` command and README provide platform-specific installation guidance for Windows, macOS, and Linux.
+- T9. Help texts are bundled for six languages: English (`en`), Russian (`ru`), Persian (`fa`), Turkish (`tr`), Arabic (`ar`), German (`de`). Texts are stored as resource files inside the package and shipped within the `.pyz` archive. English is the default fallback.
+- T10. The `howlong` command connects to Telegram only when necessary (e.g. to count messages in a dialog). It must not modify any data.
+- T11. Before writing to the output directory, the CLI checks that the directory can be created and is writable. If the check fails, the command exits with `PERMISSION_DENIED` (exit code 2).
+- T12. Dialog sub-directory names follow the pattern `<name_prefix>_<abs_id>`: first 10 characters of the dialog name (spaces → `_`, shorter names used in full), underscore, absolute value of the dialog ID.
+- T13. Time-based directory splitting uses the `split_threshold` setting from `config.yaml` (default: `50`). The hierarchy levels are: year → month → day → hour → minute. Splitting is applied recursively; messages are stored only at the leaf level in `messages.json` (full data) and `messages.md` (author, timestamp, text).
+- T14. If both `--outdir` and `config.yaml` `output_dir` are set and point to different paths, the CLI exits with an error (exit code 1). If they match, the value is accepted.
+- T15. By default, only messages are backed up. Additional content types (media, files, music, voice, links, GIFs, members) require explicit flags (`--media`, `--files`, etc.). This may require extending telegram-lib to support content-type filtering during backup.
+
+## Configuration File
+
+The `config.yaml` file has the following structure:
+
+```yaml
+telegram:
+  api_id: 12345
+  api_hash: "your_api_hash_here"
+  phone: "+1234567890"
+  session: "your_session_string_here"
+  output_dir: "./synchromessotron"
+  split_threshold: 50
+```
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `api_id` | yes | — | Telegram application ID. |
+| `api_hash` | yes | — | Telegram application hash. |
+| `phone` | yes | — | Phone number in international format. |
+| `session` | yes | — | Session string (generated by `init`). |
+| `output_dir` | no | `./synchromessotron` | Root output directory for data-producing commands. |
+| `split_threshold` | no | `50` | Maximum messages per time-period directory before splitting into sub-directories. |
+
+A template file `config.yaml.example` is distributed alongside the executable.
+
+## Output Directory Structure
+
+All data-producing commands (`backup`, `download-media`, etc.) write output into a structured **output directory**.
+
+### Location
+
+Default: `<working directory>/synchromessotron/`.
+
+Override per invocation with `--outdir=DIR`, or permanently via `output_dir` in `config.yaml`:
+
+```yaml
+telegram:
+  output_dir: "/path/to/my/data"
+```
+
+Precedence: `--outdir` flag > `config.yaml` `output_dir` > default.
+
+> **Conflict rule:** If both `--outdir` and `config.yaml` `output_dir` are present and point to different paths, the command exits with an error (exit code 1). This prevents accidental writes to an unexpected location.
+
+### Write-permission check
+
+Before writing, the CLI verifies that the output directory can be created and is writable. If the check fails, the command exits with `PERMISSION_DENIED` (exit code 2).
+
+### Dialog sub-directory naming
+
+Each dialog produces a sub-directory named:
+
+```
+<name_prefix>_<abs_id>
+```
+
+where:
+
+| Component | Rule |
+|-----------|------|
+| `name_prefix` | First 10 characters of the dialog name. Spaces are replaced with `_`. If the name is shorter than 10 characters, the full name is used. |
+| `abs_id` | Absolute value of the dialog ID (no minus sign). |
+
+**Examples:**
+
+| Dialog (type, ID, name) | Sub-directory |
+|-------------------------|---------------|
+| `Chat  -718738386  Мемуары кочевого программиста. Байки, были, думы` | `Мемуары_ко_718738386` |
+| `User  777000  Telegram` | `Telegram_777000` |
+
+### Time-based hierarchy
+
+Inside each dialog directory, data is split into time-period sub-directories. The depth is determined by the number of messages in each period and the `split_threshold` setting in `config.yaml` (default: `50`).
+
+The rule is applied **recursively** from coarse to fine:
+
+1. A **year** directory is always created (`2025/`, `2026/`, …).
+2. If a year contains more than `split_threshold` messages → **month** sub-directories (`01/` … `12/`).
+3. If a month exceeds the threshold → **day** sub-directories (`01/` … `31/`).
+4. If a day exceeds the threshold → **hour** sub-directories (`00/` … `23/`).
+5. If an hour exceeds the threshold → **minute** sub-directories (`00/` … `59/`).
+
+Messages are stored only at the deepest (leaf) level.
+
+### Message files
+
+At each leaf level, two files are written:
+
+| File | Format | Content |
+|------|--------|---------|
+| `messages.json` | JSON | All known message attributes (full data). |
+| `messages.md` | Markdown | Author, timestamp, and message text only. |
+
+### Media sub-directories
+
+When messages at a given level contain attachments, the following sub-directories are created alongside the message files:
+
+| Sub-directory | Content |
+|---------------|---------|
+| `media/` | Photos and videos. |
+| `files/` | Documents and other file attachments. |
+| `music/` | Audio tracks. |
+| `voice/` | Voice messages. |
+| `links/` | Link previews and URLs. |
+| `gifs/` | GIF animations. |
+
+Content sub-directories are created **only** when the corresponding content flag is passed to `backup` (e.g. `--media`, `--files`). They follow the same time-based splitting rule.
+
+### Members
+
+A `members/` sub-directory is created in the dialog's root directory when `--members` is passed to `backup`.
+
+### Example tree
+
+```
+synchromessotron/
+├── Мемуары_ко_718738386/
+│   ├── members/
+│   ├── 2025/
+│   │   ├── 01/
+│   │   │   ├── messages.json
+│   │   │   ├── messages.md
+│   │   │   └── media/
+│   │   └── 02/
+│   │       ├── messages.json
+│   │       └── messages.md
+│   └── 2026/
+│       ├── messages.json
+│       └── messages.md
+└── Telegram_777000/
+    └── 2026/
+        ├── messages.json
+        └── messages.md
+```
