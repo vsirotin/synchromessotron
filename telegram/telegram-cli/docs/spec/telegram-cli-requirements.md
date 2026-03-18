@@ -562,6 +562,7 @@ telegram-cli help ru backup
 - T18. The macOS binary is not notarized. On first run, macOS Gatekeeper may block execution. The README documents the one-time setup: `chmod +x telegram-cli` and `xattr -d com.apple.quarantine telegram-cli`.
 - T19. The `backup` command implements a cooldown-aware pagination loop. It fetches messages in pages (using telegram-lib `read_messages`). When a page request returns `RATE_LIMITED` with `retry_after`, the CLI waits the specified number of seconds and retries automatically. Progress is reported to stdout (e.g. `Page 3/50 — fetched 300 messages`). This loop is required both for actual backup and for accurate `--estimate` calibration.
 - T20. The `--estimate` implementation depends on a `count_messages()` function in telegram-lib (not yet implemented). This function must be added to telegram-lib before `--estimate` can be coded. See telegram-lib requirements for the corresponding update.
+- T21. All file writes in data-producing commands (`backup`, `download-media`, etc.) use **atomic writes**: data is written to a temporary file in the same directory, then renamed to the target path. On POSIX systems `os.rename()` is atomic; on Windows `os.replace()` is used. This guarantees that if the process is interrupted (user abort, crash, power loss), the target file is either the previous complete version or the new complete version — never a half-written file.
 
 ## Configuration File
 

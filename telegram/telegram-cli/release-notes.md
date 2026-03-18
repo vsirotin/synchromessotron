@@ -25,3 +25,6 @@ Eliminated standalone `howlong` command. Its functionality is now the `--estimat
 ## Version: 0.5.4
 Expanded `--estimate` requirements with full estimation mechanism: rate-limit-aware duration calculation using `count_messages()` from telegram-lib (F10). Added T19 (cooldown-aware pagination loop for backup), T20 (dependency on telegram-lib `count_messages`). Updated T10 with implementation detail.
 
+## Version: 0.5.5
+Added T21 — atomic file writes for crash safety. All data-producing commands write to a temp file first, then rename, so interrupted backups never leave corrupt output files.
+
