@@ -4,7 +4,19 @@ This document describes the functional and technical requirements for telegram-c
 
 ## Structural Requirements
 
-Telegram-cli is a standalone command-line application delivered as a single executable file (`telegram-cli.pyz`). It is packaged with [shiv](https://github.com/linkedin/shiv) so that all Python dependencies (including telegram-lib) are bundled inside. The user only needs a compatible Python installation (≥ 3.11) — no `pip install`, no virtual environments.
+Telegram-cli is a standalone command-line application distributed in three variants:
+
+| Variant | File | Requires | Built with |
+|---------|------|----------|------------|
+| **Windows** | `telegram-cli.exe` | Nothing | PyInstaller (GitHub Actions, `windows-latest`) |
+| **macOS** | `telegram-cli-macos.zip` (contains `telegram-cli`) | Nothing | PyInstaller (GitHub Actions, `macos-latest`) |
+| **Python (cross-platform)** | `telegram-cli.pyz` | Python ≥ 3.11 | shiv |
+
+The Python variant (`telegram-cli.pyz`) is packaged with [shiv](https://github.com/linkedin/shiv) so that all Python dependencies (including telegram-lib) are bundled inside. Users who choose this variant need a compatible Python installation — no `pip install`, no virtual environments. The Python variant is also intended for users who want full code transparency: `.pyz` is a standard zip archive that can be inspected.
+
+The Windows and macOS variants are self-contained executables built with [PyInstaller](https://pyinstaller.org). They do not require Python to be installed. These are built automatically by a GitHub Actions workflow (`release.yml`) and uploaded as release assets.
+
+All three variants are distributed via [GitHub Releases](../../releases). Each release contains all three files as downloadable assets. There is no need for a separate directory of old versions — GitHub Releases provides version history.
 
 The tool reads credentials from a `config.yaml` file located next to the executable. The user interacts only with CLI commands and does not need to know about internal implementation details.
 
@@ -553,17 +565,20 @@ telegram-cli howlong get-dialogs
 - T2. The CLI uses Python's `argparse` module for argument parsing.
 - T3. All output uses two formats: human-readable tables/text to stdout (when connected to a TTY), and structured files in the output directory when `--outdir` is specified. When stdout is piped (not a TTY), output is JSON.
 - T4. When an error occurs, the tool prints a structured error message to stderr and exits with the appropriate exit code.
-- T5. The CLI is packaged as a single `.pyz` file using [shiv](https://github.com/linkedin/shiv). All Python dependencies (telegram-lib, Telethon, python-dotenv, PyYAML, etc.) are bundled inside. The user invokes it via `python3 telegram-cli.pyz <command>`.
+- T5. The Python variant of the CLI is packaged as a single `.pyz` file using [shiv](https://github.com/linkedin/shiv). All Python dependencies (telegram-lib, Telethon, python-dotenv, PyYAML, etc.) are bundled inside. The user invokes it via `python3 telegram-cli.pyz <command>`.
 - T6. Unit tests mock internal API calls and verify argument parsing, output formatting, and error handling.
 - T7. The CLI includes a built-in `init` command that interactively generates a session string and writes it to `config.yaml`, so users do not need separate tooling.
-- T8. The CLI requires Python ≥ 3.11. The `init` command and README provide platform-specific installation guidance for Windows, macOS, and Linux.
-- T9. Help texts are bundled for six languages: English (`en`), Russian (`ru`), Persian (`fa`), Turkish (`tr`), Arabic (`ar`), German (`de`). Texts are stored as resource files inside the package and shipped within the `.pyz` archive. English is the default fallback.
+- T8. The CLI requires Python ≥ 3.11 for the `.pyz` variant. The Windows (`.exe`) and macOS variants do not require Python. The `init` command and README provide platform-specific guidance.
+- T9. Help texts are bundled for six languages: English (`en`), Russian (`ru`), Persian (`fa`), Turkish (`tr`), Arabic (`ar`), German (`de`). Texts are stored as resource files inside the package and shipped within all distribution variants. English is the default fallback.
 - T10. The `howlong` command connects to Telegram only when necessary (e.g. to count messages in a dialog). It must not modify any data.
 - T11. Before writing to the output directory, the CLI checks that the directory can be created and is writable. If the check fails, the command exits with `PERMISSION_DENIED` (exit code 2).
 - T12. Dialog sub-directory names follow the pattern `<name_prefix>_<abs_id>`: first 10 characters of the dialog name (spaces → `_`, shorter names used in full), underscore, absolute value of the dialog ID.
 - T13. Time-based directory splitting uses the `split_threshold` setting from `config.yaml` (default: `50`). The hierarchy levels are: year → month → day → hour → minute. Splitting is applied recursively; messages are stored only at the leaf level in `messages.json` (full data) and `messages.md` (author, timestamp, text).
 - T14. If both `--outdir` and `config.yaml` `output_dir` are set and point to different paths, the CLI exits with an error (exit code 1). If they match, the value is accepted.
 - T15. By default, only messages are backed up. Additional content types (media, files, music, voice, links, GIFs, members) require explicit flags (`--media`, `--files`, etc.). This may require extending telegram-lib to support content-type filtering during backup.
+- T16. A GitHub Actions workflow (`release.yml`) builds the Windows `.exe` and macOS binary using PyInstaller on the respective runner OS (`windows-latest`, `macos-latest`). The `.pyz` is built with shiv on `ubuntu-latest`. All three artifacts are uploaded as release assets when a version tag (e.g. `v0.5.0`) is pushed.
+- T17. The Windows `.exe` is not code-signed. On first run, Windows SmartScreen may warn the user. The README documents how to proceed ("More info" → "Run anyway").
+- T18. The macOS binary is not notarized. On first run, macOS Gatekeeper may block execution. The README documents the one-time setup: `chmod +x telegram-cli` and `xattr -d com.apple.quarantine telegram-cli`.
 
 ## Configuration File
 

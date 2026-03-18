@@ -40,40 +40,35 @@ You do not need to be a programmer to use this tool. Just follow the steps below
 
 ## How to Install
 
-### Step 1 — Check or install Python
+### Step 1 — Choose your variant and download
 
-telegram-cli requires **Python 3.11 or newer**. Open a terminal (or Command Prompt on Windows) and check your version:
+Go to the [latest release](../../releases/latest) page and download the variant for your platform:
 
-```
-python3 --version
-```
+| Platform | File | Python needed? |
+|----------|------|----------------|
+| **Windows** | `telegram-cli.exe` | No |
+| **macOS** | `telegram-cli-macos.zip` | No |
+| **Any (Python)** | `telegram-cli.pyz` | Yes (≥ 3.11) |
 
-On Windows, try `python --version` if `python3` is not recognised.
+Put the downloaded file in a folder of your choice — for example, a `telegram-cli` folder on your Desktop or in your home directory.
 
-**If Python is not installed or the version is too old:**
+> **Which variant should I choose?**
+>
+> - **Windows or macOS** — use the platform-specific variant. No extra software needed.
+> - **Python variant** — choose this if you want to be absolutely sure about the code running on your computer: `.pyz` is a standard Python zip archive that you can inspect. It also works on Linux and any other OS with Python ≥ 3.11.
 
-| Platform | How to install |
-|----------|---------------|
-| **Windows** | Download the installer from <https://www.python.org/downloads/> . Run it and **check the box "Add Python to PATH"** during installation. |
-| **macOS** | Install via [Homebrew](https://brew.sh/): `brew install python@3.11` . Or download from <https://www.python.org/downloads/> . |
-| **Linux (Debian/Ubuntu)** | `sudo apt update && sudo apt install python3` |
-| **Linux (Fedora)** | `sudo dnf install python3` |
+**Platform-specific first-run notes:**
 
-After installation, verify:
+- **Windows:** On the first run, SmartScreen may show _"Windows protected your PC"_. Click **More info** → **Run anyway**. This happens once.
+- **macOS:** After unzipping, open Terminal in the folder and run once:
+  ```
+  chmod +x telegram-cli
+  xattr -d com.apple.quarantine telegram-cli
+  ```
+  This removes the download quarantine and makes the file executable.
+- **Python variant:** Requires Python 3.11 or newer. Check with `python3 --version`. Install from <https://www.python.org/downloads/> if needed.
 
-```
-python3 --version
-```
-
-You should see `Python 3.11.x` or newer.
-
-### Step 2 — Download telegram-cli
-
-Download the file `telegram-cli.pyz` from the [latest release](../../releases/latest) page. Put it in a folder of your choice — for example, a `telegram-cli` folder on your Desktop or in your home directory.
-
-This single file contains everything the tool needs. No additional installation is required.
-
-### Step 3 — Create a Telegram application
+### Step 2 — Create a Telegram application
 
 To use telegram-cli you need your own Telegram API credentials. This is a one-time setup.
 
@@ -88,18 +83,18 @@ To use telegram-cli you need your own Telegram API credentials. This is a one-ti
 
    ![api_id and api_hash](docs/images/telegram2.png)
 
-### Step 4 — Set up your session
+### Step 3 — Set up your session
 
-Open a terminal, navigate to the folder where you placed `telegram-cli.pyz`, and run:
+Open a terminal, navigate to the folder where you placed the downloaded file, and run:
 
-```
-python3 telegram-cli.pyz init
-```
-
-On Windows, use `python` instead of `python3`.
+| Variant | Command |
+|---------|---------|
+| **Windows** | `telegram-cli init` |
+| **macOS** | `./telegram-cli init` |
+| **Python** | `python3 telegram-cli.pyz init` |
 
 The command will:
-1. Ask for your **api_id**, **api_hash**, and **phone number** (from Step 3).
+1. Ask for your **api_id**, **api_hash**, and **phone number** (from Step 2).
 2. Send a login code to your Telegram app — type it when prompted.
 3. If you have Two-Step Verification enabled, ask for your **2FA password**.
 4. Create a `config.yaml` file with your credentials and session.
@@ -110,14 +105,16 @@ The command will:
 
 ```
 ✓ Session created and saved to config.yaml
-  Run 'python3 telegram-cli.pyz whoami' to verify.
+  Run 'telegram-cli whoami' to verify.
 ```
 
-### Step 5 — Verify the setup
+### Step 4 — Verify the setup
 
-```
-python3 telegram-cli.pyz whoami
-```
+| Variant | Command |
+|---------|---------|
+| **Windows** | `telegram-cli whoami` |
+| **macOS** | `./telegram-cli whoami` |
+| **Python** | `python3 telegram-cli.pyz whoami` |
 
 **Expected result:**
 
@@ -131,9 +128,13 @@ python3 telegram-cli.pyz whoami
 
 Possible errors: `AUTH_FAILED`, `NETWORK_ERROR`, `SESSION_INVALID`. See [Error Handling](#error-handling) below.
 
+Also verify that Telegram is reachable:
+
 ```
-python3 telegram-cli.pyz ping
+telegram-cli ping
 ```
+
+Or `python3 telegram-cli.pyz ping` (Python variant) / `./telegram-cli ping` (macOS).
 
 **Expected result:**
 
@@ -151,8 +152,8 @@ The `config.yaml` file contains sensitive data: your Telegram API credentials an
 
 1. **Never share `config.yaml` with anyone.** It is like a password.
 2. **Never upload it to the internet** — do not put it on GitHub, Google Drive, Dropbox, email, or any public/shared location.
-3. **Keep it only in the same folder as `telegram-cli.pyz`** on your own computer.
-4. **If you suspect compromise** — if someone may have seen or copied your `config.yaml` — immediately revoke the session in Telegram: go to **Settings → Devices** (or **Settings → Privacy and Security → Active Sessions**) and terminate the suspect session. Then re-run `python3 telegram-cli.pyz init` to create a new one.
+3. **Keep it only in the same folder as the telegram-cli executable** on your own computer.
+4. **If you suspect compromise** — if someone may have seen or copied your `config.yaml` — immediately revoke the session in Telegram: go to **Settings → Devices** (or **Settings → Privacy and Security → Active Sessions**) and terminate the suspect session. Then re-run `telegram-cli init` to create a new one.
 
 > The file `config.yaml.example` is a template with no real credentials — it is safe to share or commit.
 
@@ -322,20 +323,28 @@ In this example:
 
 ## Command Reference
 
-> In all examples below, replace `python3` with `python` on Windows if needed.
-
 ### get-dialogs — List dialogs
 
 ```
-python3 telegram-cli.pyz get-dialogs [--limit=N] [--outdir=DIR]
+get-dialogs [--limit=N] [--outdir=DIR]
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
+**Parameters:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
 | `--limit` | all | Maximum number of dialogs to return. |
 | `--outdir` | — | Save `dialogs.json` to this directory (see [Output Directory](#output-directory)). |
 
-**Expected result** (to terminal):
+**Call examples:**
+
+| Variant | Command |
+|---------|---------|
+| **Windows** | `telegram-cli get-dialogs --limit=50` |
+| **macOS** | `./telegram-cli get-dialogs --limit=50` |
+| **Python** | `python3 telegram-cli.pyz get-dialogs --limit=50` |
+
+**Expected result:**
 
 ```
   TYPE         ID                 NAME
@@ -356,11 +365,14 @@ Possible errors: `NETWORK_ERROR`, `PERMISSION_DENIED`, `RATE_LIMITED`, `SESSION_
 ### backup — Backup messages
 
 ```
-python3 telegram-cli.pyz backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--outdir=DIR] [--media] [--files] [--music] [--voice] [--links] [--gifs] [--members]
+backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--outdir=DIR] [--media] [--files] [--music] [--voice] [--links] [--gifs] [--members]
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
+**Parameters:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `<dialog_id>` | — | Dialog ID (required). Use `get-dialogs` to find it. |
 | `--since` | — | ISO 8601 timestamp; only messages after it are returned (incremental). |
 | `--limit` | 100 | Maximum number of messages. |
 | `--outdir` | `./synchromessotron` | Root output directory (see [Output Directory](#output-directory)). |
@@ -374,21 +386,21 @@ python3 telegram-cli.pyz backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--o
 
 By default, only messages are saved (`messages.json` + `messages.md`). Add content flags to include additional data.
 
-**Expected result** (messages only):
+**Call examples:**
 
-```
-python3 telegram-cli.pyz backup -1001234567890 --limit=500
-```
+| Variant | Command |
+|---------|---------|
+| **Windows** | `telegram-cli backup -1001234567890 --limit=500` |
+| **macOS** | `./telegram-cli backup -1001234567890 --limit=500` |
+| **Python** | `python3 telegram-cli.pyz backup -1001234567890 --limit=500` |
+
+**Expected result** (messages only):
 
 ```
 ✓ 500 messages saved to synchromessotron/Telegram_777000/2026/
 ```
 
-**Expected result** (with media):
-
-```
-python3 telegram-cli.pyz backup -1001234567890 --limit=500 --media --files
-```
+**Expected result** (with `--media --files`):
 
 ```
 ✓ 500 messages saved to synchromessotron/Telegram_777000/2026/
@@ -396,11 +408,7 @@ python3 telegram-cli.pyz backup -1001234567890 --limit=500 --media --files
 ✓ 7 documents downloaded
 ```
 
-**Expected result** (incremental):
-
-```
-python3 telegram-cli.pyz backup -1001234567890 --since="2026-03-01T00:00:00"
-```
+**Expected result** (incremental, `--since="2026-03-01T00:00:00"`):
 
 ```
 ✓ 12 messages saved to synchromessotron/Telegram_777000/2026/03/
@@ -413,14 +421,25 @@ Possible errors: `ENTITY_NOT_FOUND`, `NETWORK_ERROR`, `PERMISSION_DENIED`, `RATE
 ### send — Send a message
 
 ```
-python3 telegram-cli.pyz send <dialog_id> --text=TEXT
+send <dialog_id> --text=TEXT
 ```
+
+**Parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `<dialog_id>` | Dialog ID (required). |
+| `--text` | Message text (required). |
+
+**Call examples:**
+
+| Variant | Command |
+|---------|---------|
+| **Windows** | `telegram-cli send -1001234567890 --text="Hello from CLI!"` |
+| **macOS** | `./telegram-cli send -1001234567890 --text="Hello from CLI!"` |
+| **Python** | `python3 telegram-cli.pyz send -1001234567890 --text="Hello from CLI!"` |
 
 **Expected result:**
-
-```
-python3 telegram-cli.pyz send -1001234567890 --text="Hello from CLI!"
-```
 
 ```
 ✓ Message sent
@@ -436,14 +455,26 @@ Possible errors: `ENTITY_NOT_FOUND`, `PERMISSION_DENIED`, `RATE_LIMITED`. See [E
 ### edit — Edit a message
 
 ```
-python3 telegram-cli.pyz edit <dialog_id> <message_id> --text=TEXT
+edit <dialog_id> <message_id> --text=TEXT
 ```
+
+**Parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `<dialog_id>` | Dialog ID (required). |
+| `<message_id>` | Message ID (required). |
+| `--text` | New message text (required). |
+
+**Call examples:**
+
+| Variant | Command |
+|---------|---------|
+| **Windows** | `telegram-cli edit -1001234567890 42 --text="Corrected text"` |
+| **macOS** | `./telegram-cli edit -1001234567890 42 --text="Corrected text"` |
+| **Python** | `python3 telegram-cli.pyz edit -1001234567890 42 --text="Corrected text"` |
 
 **Expected result:**
-
-```
-python3 telegram-cli.pyz edit -1001234567890 42 --text="Corrected text"
-```
 
 ```
 ✓ Message edited
@@ -459,14 +490,25 @@ Possible errors: `ENTITY_NOT_FOUND`, `NOT_MODIFIED`, `PERMISSION_DENIED`. See [E
 ### delete — Delete messages
 
 ```
-python3 telegram-cli.pyz delete <dialog_id> <message_id> [<message_id> ...]
+delete <dialog_id> <message_id> [<message_id> ...]
 ```
+
+**Parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `<dialog_id>` | Dialog ID (required). |
+| `<message_id>` | One or more message IDs (required). |
+
+**Call examples:**
+
+| Variant | Command |
+|---------|---------|
+| **Windows** | `telegram-cli delete -1001234567890 42 43 44` |
+| **macOS** | `./telegram-cli delete -1001234567890 42 43 44` |
+| **Python** | `python3 telegram-cli.pyz delete -1001234567890 42 43 44` |
 
 **Expected result:**
-
-```
-python3 telegram-cli.pyz delete -1001234567890 42 43 44
-```
 
 ```
 ✓ 3 messages deleted
@@ -479,20 +521,28 @@ Possible errors: `ENTITY_NOT_FOUND`, `PERMISSION_DENIED`. See [Error Handling](#
 ### download-media — Download media
 
 ```
-python3 telegram-cli.pyz download-media <dialog_id> <message_id> [--outdir=DIR]
+download-media <dialog_id> <message_id> [--outdir=DIR]
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
+**Parameters:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `<dialog_id>` | — | Dialog ID (required). |
+| `<message_id>` | — | Message ID (required). |
 | `--outdir` | `./synchromessotron` | Root output directory (see [Output Directory](#output-directory)). |
 
 The file is saved into the appropriate content sub-directory (`media/`, `files/`, `music/`, `voice/`, `gifs/`) inside the dialog's time-based hierarchy.
 
-**Expected result:**
+**Call examples:**
 
-```
-python3 telegram-cli.pyz download-media -1001234567890 42
-```
+| Variant | Command |
+|---------|---------|
+| **Windows** | `telegram-cli download-media -1001234567890 42` |
+| **macOS** | `./telegram-cli download-media -1001234567890 42` |
+| **Python** | `python3 telegram-cli.pyz download-media -1001234567890 42` |
+
+**Expected result:**
 
 ```
 ✓ Downloaded: synchromessotron/Telegram_777000/2026/03/media/photo_42.jpg (2.1 MB)
@@ -505,8 +555,18 @@ Possible errors: `ENTITY_NOT_FOUND`, `NETWORK_ERROR`, `PERMISSION_DENIED`. See [
 ### ping — Check availability
 
 ```
-python3 telegram-cli.pyz ping
+ping
 ```
+
+No parameters.
+
+**Call examples:**
+
+| Variant | Command |
+|---------|---------|
+| **Windows** | `telegram-cli ping` |
+| **macOS** | `./telegram-cli ping` |
+| **Python** | `python3 telegram-cli.pyz ping` |
 
 **Expected result:**
 
@@ -521,8 +581,18 @@ Possible errors: `NETWORK_ERROR`. See [Error Handling](#error-handling) below.
 ### whoami — Validate session
 
 ```
-python3 telegram-cli.pyz whoami
+whoami
 ```
+
+No parameters.
+
+**Call examples:**
+
+| Variant | Command |
+|---------|---------|
+| **Windows** | `telegram-cli whoami` |
+| **macOS** | `./telegram-cli whoami` |
+| **Python** | `python3 telegram-cli.pyz whoami` |
 
 **Expected result:**
 
@@ -541,26 +611,23 @@ Possible errors: `AUTH_FAILED`, `SESSION_INVALID`. See [Error Handling](#error-h
 ### help — Show help in your language
 
 ```
-python3 telegram-cli.pyz help [LANG] [COMMAND]
+help [LANG] [COMMAND]
 ```
 
-| Argument | Default | Description |
-|----------|---------|-------------|
+**Parameters:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
 | `LANG` | `en` | ISO 639-1 language code. Supported: `en`, `ru`, `fa`, `tr`, `ar`, `de`. |
 | `COMMAND` | — | If given, show detailed help for that specific command. |
 
-**Examples:**
+**Call examples:**
 
-```
-# General help in English (default)
-python3 telegram-cli.pyz help
-
-# General help in German
-python3 telegram-cli.pyz help de
-
-# Detailed help for the backup command in Russian
-python3 telegram-cli.pyz help ru backup
-```
+| Variant | Command |
+|---------|---------|
+| **Windows** | `telegram-cli help de backup` |
+| **macOS** | `./telegram-cli help de backup` |
+| **Python** | `python3 telegram-cli.pyz help de backup` |
 
 **Expected result** (general, English):
 
@@ -591,23 +658,23 @@ Run 'telegram-cli help <lang> <command>' for details.
 Some commands (e.g. `backup`, `download-media`) may take a long time depending on the amount of data. Use `howlong` to get an estimate before running them.
 
 ```
-python3 telegram-cli.pyz howlong <command> [ARGS...]
+howlong <command> [ARGS...]
 ```
 
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `command` | yes | The command to estimate (`backup`, `download-media`, `get-dialogs`). |
+**Parameters:**
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `<command>` | yes | The command to estimate (`backup`, `download-media`, `get-dialogs`). |
 | `ARGS` | no | The same arguments you would pass to the actual command. |
 
-**Examples:**
+**Call examples:**
 
-```
-# How long would a full backup of 5000 messages take?
-python3 telegram-cli.pyz howlong backup -1001234567890 --limit=5000
-
-# How long to download a media file?
-python3 telegram-cli.pyz howlong download-media -1001234567890 42
-```
+| Variant | Command |
+|---------|---------|
+| **Windows** | `telegram-cli howlong backup -1001234567890 --limit=5000` |
+| **macOS** | `./telegram-cli howlong backup -1001234567890 --limit=5000` |
+| **Python** | `python3 telegram-cli.pyz howlong backup -1001234567890 --limit=5000` |
 
 **Expected result:**
 
@@ -624,8 +691,18 @@ Possible errors: `NETWORK_ERROR`, unsupported command. See [Error Handling](#err
 ### version — Show version information
 
 ```
-python3 telegram-cli.pyz version
+version
 ```
+
+No parameters.
+
+**Call examples:**
+
+| Variant | Command |
+|---------|---------|
+| **Windows** | `telegram-cli version` |
+| **macOS** | `./telegram-cli version` |
+| **Python** | `python3 telegram-cli.pyz version` |
 
 **Expected result:**
 
@@ -696,7 +773,7 @@ Error [RATE_LIMITED]: Too many requests — retry after 30s
 | `NOT_MODIFIED` | Edit text is identical to current text. | Provide different text. |
 | `PERMISSION_DENIED` | No permission (e.g. read-only channel, not your message). | Check your rights in the dialog. |
 | `RATE_LIMITED` | Too many requests. | Wait the number of seconds shown in `retry_after`, then retry. |
-| `SESSION_INVALID` | Session expired or revoked. | Re-run `python3 telegram-cli.pyz init`. |
+| `SESSION_INVALID` | Session expired or revoked. | Re-run `telegram-cli init`. |
 
 ## Exit Codes
 

@@ -3,7 +3,7 @@ name: common-development
 description: Common rules for code development that apply across all project types (libraries, CLI tools, services, etc.). Covers requirements clarity, bug-fix workflow, logging, coding style, testing discipline, version management, and commit conventions.
 metadata:
   author: vsirotin
-  version: "1.1"
+  version: "1.2"
 ---
 
 # Common Development Rules
@@ -76,40 +76,6 @@ If you see suddenly that you cannot solve some problem, stop the development and
 
 If you try to fix the same bug too long (more than 20 iterations), stop the development and ask me.
 
-### 12. Post-development: versioning, release notes, and commit text
+### 12. Post-task checklist
 
-After completing development and unit-testing, perform these steps:
-
-a) **Update version** — Update the file `<project-root>/src/version.yaml` (if it exists). Use semantic versioning rules. Remember the new version.
-
-b) **Update release notes** — Append the new version entry **after** the existing content in `<project-root>/release-notes.md` (if it exists). Include the remembered version number and a short explanation of the version update. Do not reorder or overwrite previous entries.
-
-c) **Write commit text proposal** — Rewrite the content of `<project-root>/commit-text-proposal.txt` with the following format:
-
-```
-<prefix>: Project: <project>. Version: <current version>. <short label for update>.
-```
-
-`<prefix>` is optional. `<project>` is the sub-project path (e.g. `telegram/telegram-lib`). If one commit updates many sub-projects, write only about the main updated sub-project.
-
-Examples for using prefixes:
-
-| Prefix       | Meaning                                                        |
-|--------------|----------------------------------------------------------------|
-| `[test]`     | Update `test/*` files                                          |
-| `[dist]`     | Changes to submodules, version bumps, updates to `package.json`|
-| `[minor]`    | Small changes                                                  |
-| `[doc]`      | Updates to documentation                                       |
-| `[fix]`      | Bug fixes                                                      |
-| `[bin]`      | Update binary scripts associated with the project              |
-| `[refactor]` | Refactor of existing code                                      |
-| `[nit]`      | Small code review changes mainly around style or syntax        |
-| `[feat]`     | New features                                                   |
-
-**Examples:**
-
-```
-fix: Project: telegram/telegram-lib. Version 1.0.12. Closes #9, fix path issue.
-nit: Project: telegram/telegram-lib. Version 1.3.12. Swap let for const.
-doc: Project: telegram/telegram-lib. Version 2.3.15. Added usage section to README.md.
-```
+After completing a task that makes essential changes, apply the [post-task](../post-task/SKILL.md) skill (version bump, release notes, commit text proposal).
