@@ -76,6 +76,10 @@ If you see suddenly that you cannot solve some problem, stop the development and
 
 If you try to fix the same bug too long (more than 20 iterations), stop the development and ask me.
 
-### 12. Post-task checklist
+### 12. Test dependent projects
+
+When a library changes, also run the tests of projects that depend on it. Discover dependents by scanning `pyproject.toml` files in the workspace for the library name in their `dependencies` list.
+
+### 13. Post-task checklist
 
 After completing a task that makes essential changes, apply the [post-task](../post-task/SKILL.md) skill (version bump, release notes, commit text proposal).
