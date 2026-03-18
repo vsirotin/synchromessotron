@@ -39,6 +39,7 @@ _models_mod: ModuleType | None = None
 _client_mod: ModuleType | None = None
 _health_mod: ModuleType | None = None
 _dialogs_mod: ModuleType | None = None
+_messages_mod: ModuleType | None = None
 _version_mod: ModuleType | None = None
 
 
@@ -94,3 +95,60 @@ def get_lib_version():
         _ensure_lib_path()
         _version_mod = _load_lib_module("version")
     return _version_mod.get_version()
+
+
+def _get_messages_mod():
+    """Lazy-load the telegram-lib messages module."""
+    global _messages_mod
+    if _messages_mod is None:
+        _ensure_lib_path()
+        _messages_mod = _load_lib_module("messages")
+    return _messages_mod
+
+
+async def count_messages(client, dialog_id, *, since=None):
+    """Delegate to telegram-lib count_messages."""
+    return await _get_messages_mod().count_messages(client, dialog_id, since=since)
+
+
+async def read_messages(client, dialog_id, *, since=None, limit=100):
+    """Delegate to telegram-lib read_messages."""
+    return await _get_messages_mod().read_messages(client, dialog_id, since=since, limit=limit)
+
+
+async def send_message(client, dialog_id, text):
+    """Delegate to telegram-lib send_message."""
+    return await _get_messages_mod().send_message(client, dialog_id, text)
+
+
+async def edit_message(client, dialog_id, message_id, new_text):
+    """Delegate to telegram-lib edit_message."""
+    return await _get_messages_mod().edit_message(client, dialog_id, message_id, new_text)
+
+
+async def delete_message(client, dialog_id, message_ids):
+    """Delegate to telegram-lib delete_message."""
+    return await _get_messages_mod().delete_message(client, dialog_id, message_ids)
+
+
+# ---------------------------------------------------------------------------
+# Media module
+# ---------------------------------------------------------------------------
+
+_media_mod: ModuleType | None = None
+
+
+def _get_media_mod():
+    """Lazy-load the telegram-lib media module."""
+    global _media_mod
+    if _media_mod is None:
+        _ensure_lib_path()
+        _media_mod = _load_lib_module("media")
+    return _media_mod
+
+
+async def download_media(client, dialog_id, message_id, *, dest_dir="."):
+    """Delegate to telegram-lib download_media."""
+    return await _get_media_mod().download_media(
+        client, dialog_id, message_id, dest_dir=dest_dir,
+    )

@@ -1,5 +1,5 @@
 """
-Message functions — read, send, edit, delete (F1–F4).
+Message functions — read, send, edit, delete, count (F1–F4, F10).
 
 All functions are stateless wrappers around Telethon calls.
 Each returns ``TgResult`` with a typed payload or a ``TgError`` (T3, T6).
@@ -215,6 +215,54 @@ async def delete_message(
         entity = await client.get_entity(dialog_id)
         await client.delete_messages(entity, message_ids)
         return TgResult(payload=message_ids)
+    except ValueError as exc:
+        return TgResult(error=TgError(ErrorCode.ENTITY_NOT_FOUND, str(exc)))
+    except Exception as exc:
+        return TgResult(error=_map_exception(exc))
+
+
+# ---------------------------------------------------------------------------
+# F10 — Count messages (lightweight metadata query)
+# ---------------------------------------------------------------------------
+
+
+@logged
+async def count_messages(
+    client: TelegramClient,
+    dialog_id: int | str,
+    *,
+    since: datetime | None = None,
+) -> TgResult[int]:
+    """Return the total number of messages in a dialog without downloading content (F10).
+
+    This is a lightweight metadata query that uses Telethon's
+    ``client.get_messages(entity, limit=0)`` which returns a ``TotalList``
+    with ``.total`` — the server-side message count — without fetching
+    any message bodies.
+
+    When *since* is provided, only messages strictly **after** that
+    timestamp are counted (using ``offset_date``).
+
+    Args:
+        client: An authenticated ``TelegramClient``.
+        dialog_id: Numeric dialog ID or string handle (e.g. ``"me"``).
+        since: If set, count only messages posted after this timestamp.
+
+    Returns:
+        ``TgResult`` whose payload is an ``int`` — the message count.
+
+    Possible errors (``TgResult.error``):
+        - ``ENTITY_NOT_FOUND`` — dialog_id does not resolve to a known entity.
+        - ``NETWORK_ERROR`` — connection lost or timed out.
+        - ``RATE_LIMITED`` — Telegram flood-wait; ``retry_after`` is populated.
+        - ``SESSION_INVALID`` — session string is invalid or revoked.
+        - ``AUTH_FAILED`` — user account is deactivated or banned.
+        - ``INTERNAL_ERROR`` — unexpected / unmapped exception.
+    """
+    try:
+        entity = await client.get_entity(dialog_id)
+        result = await client.get_messages(entity, limit=0, offset_date=since)
+        return TgResult(payload=result.total)
     except ValueError as exc:
         return TgResult(error=TgError(ErrorCode.ENTITY_NOT_FOUND, str(exc)))
     except Exception as exc:

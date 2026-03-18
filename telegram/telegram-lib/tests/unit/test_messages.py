@@ -314,3 +314,102 @@ class TestDeleteMessage:
 
         assert not result.ok
         assert result.error.code == ErrorCode.PERMISSION_DENIED
+
+
+# -----------------------------------------------------------------------
+# F10 — count_messages
+# -----------------------------------------------------------------------
+
+
+class TestCountMessages:
+    """F10: count messages without downloading content."""
+
+    @pytest.mark.asyncio
+    async def test_count_messages_happy(self):
+        from src.messages import count_messages
+
+        client = _mock_client()
+        entity = _mock_entity()
+        client.get_entity = AsyncMock(return_value=entity)
+
+        total_list = MagicMock()
+        total_list.total = 4200
+        client.get_messages = AsyncMock(return_value=total_list)
+
+        result = await count_messages(client, 123)
+
+        assert result.ok
+        assert result.payload == 4200
+        client.get_messages.assert_called_once_with(entity, limit=0, offset_date=None)
+
+    @pytest.mark.asyncio
+    async def test_count_messages_since(self):
+        from src.messages import count_messages
+
+        client = _mock_client()
+        entity = _mock_entity()
+        client.get_entity = AsyncMock(return_value=entity)
+
+        total_list = MagicMock()
+        total_list.total = 150
+        client.get_messages = AsyncMock(return_value=total_list)
+
+        result = await count_messages(client, 123, since=SINCE)
+
+        assert result.ok
+        assert result.payload == 150
+        client.get_messages.assert_called_once_with(entity, limit=0, offset_date=SINCE)
+
+    @pytest.mark.asyncio
+    async def test_count_messages_not_found(self):
+        from src.messages import count_messages
+
+        client = _mock_client()
+        client.get_entity = AsyncMock(side_effect=ValueError("not found"))
+
+        result = await count_messages(client, 999)
+
+        assert not result.ok
+        assert result.error.code == ErrorCode.ENTITY_NOT_FOUND
+
+    @pytest.mark.asyncio
+    async def test_count_messages_no_conn(self):
+        from src.messages import count_messages
+
+        client = _mock_client()
+        client.get_entity = AsyncMock(side_effect=ConnectionError("no network"))
+
+        result = await count_messages(client, 123)
+
+        assert not result.ok
+        assert result.error.code == ErrorCode.NETWORK_ERROR
+
+    @pytest.mark.asyncio
+    async def test_count_messages_timeout(self):
+        from src.messages import count_messages
+
+        client = _mock_client()
+        client.get_entity = AsyncMock(side_effect=TimeoutError("timed out"))
+
+        result = await count_messages(client, 123)
+
+        assert not result.ok
+        assert result.error.code == ErrorCode.NETWORK_ERROR
+
+    @pytest.mark.asyncio
+    async def test_count_messages_rate_limit(self):
+        from src.messages import count_messages
+        from telethon.errors import FloodWaitError
+
+        client = _mock_client()
+        entity = _mock_entity()
+        client.get_entity = AsyncMock(return_value=entity)
+        client.get_messages = AsyncMock(
+            side_effect=FloodWaitError(request=None, capture=20)
+        )
+
+        result = await count_messages(client, 123)
+
+        assert not result.ok
+        assert result.error.code == ErrorCode.RATE_LIMITED
+        assert result.error.retry_after == 20.0

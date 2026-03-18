@@ -1,0 +1,410 @@
+"""
+Backup command (F1) — retrieve messages from a dialog.
+
+Supports full and incremental backup with pagination (T19),
+rate-limit handling, --estimate mode (T10/T20), resumable backup (T22),
+atomic writes (T21), and structured progress output (T23).
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import math
+import os
+import sys
+import tempfile
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+from src.config import load_config
+from src._lib import create_client, count_messages, read_messages
+from src.errors import format_error_and_exit
+
+logger = logging.getLogger("telegram_cli")
+
+# Pagination settings
+PAGE_SIZE = 100
+AVG_PAGE_FETCH_MS = 800
+COOLDOWN_OVERHEAD_MS = 200
+
+
+# ---------------------------------------------------------------------------
+# Atomic write (T21)
+# ---------------------------------------------------------------------------
+
+
+def _atomic_write_json(path: Path, data) -> None:
+    """Write JSON to *path* atomically via temp file + rename."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+            f.write("\n")
+        os.replace(tmp, str(path))
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+# ---------------------------------------------------------------------------
+# Resumable scan (T22)
+# ---------------------------------------------------------------------------
+
+
+def _scan_existing(output_path: Path) -> set[int]:
+    """Return set of message IDs already saved in *output_path*.
+
+    If the file doesn't exist or is not valid JSON, returns an empty set.
+    """
+    if not output_path.is_file():
+        return set()
+    try:
+        data = json.loads(output_path.read_text(encoding="utf-8"))
+        if isinstance(data, list):
+            return {m["id"] for m in data if isinstance(m, dict) and "id" in m}
+    except (json.JSONDecodeError, OSError, KeyError):
+        pass
+    return set()
+
+
+def _latest_timestamp(output_path: Path) -> datetime | None:
+    """Return the latest message timestamp from the existing file, or None."""
+    if not output_path.is_file():
+        return None
+    try:
+        data = json.loads(output_path.read_text(encoding="utf-8"))
+        if isinstance(data, list) and data:
+            dates = []
+            for m in data:
+                if isinstance(m, dict) and "date" in m:
+                    dates.append(datetime.fromisoformat(m["date"]))
+            return max(dates) if dates else None
+    except (json.JSONDecodeError, OSError, ValueError):
+        pass
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Progress output (T23)
+# ---------------------------------------------------------------------------
+
+
+def _is_tty() -> bool:
+    return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+
+
+def _progress_start(dialog_id, limit, since, output):
+    """Stage 1 — print start info."""
+    parts = [f"Backup: dialog={dialog_id}, limit={limit}"]
+    if since:
+        parts.append(f"since={since}")
+    if output:
+        parts.append(f"output={output}")
+    print(" | ".join(parts))
+
+
+def _progress_local_scan(local_count, latest_ts, new_count):
+    """Stage 2 — print local scan result."""
+    ts_str = latest_ts.isoformat() if latest_ts else "none"
+    print(
+        f"Local: {local_count} messages (latest: {ts_str}). "
+        f"To download: {new_count} new messages."
+    )
+
+
+def _progress_estimate(new_count, pages):
+    """Stage 3 — print time estimate for remaining download."""
+    per_page_s = (AVG_PAGE_FETCH_MS + COOLDOWN_OVERHEAD_MS) / 1000
+    total_s = pages * per_page_s
+    minutes = total_s / 60
+    if minutes < 1:
+        time_str = f"{total_s:.0f} seconds"
+    else:
+        time_str = f"{minutes:.0f} minutes"
+    print(
+        f"Estimated time: \u2248 {time_str} "
+        f"({new_count} messages, {pages} pages)."
+    )
+
+
+def _progress_bar(current_page, total_pages, fetched, total, elapsed, tty):
+    """Stage 4 — print progress bar."""
+    if total == 0:
+        pct = 100
+    else:
+        pct = min(100, int(fetched / total * 100))
+    bar_len = 16
+    filled = int(bar_len * pct / 100)
+    bar = "\u2588" * filled + "\u2591" * (bar_len - filled)
+    remaining_s = (elapsed / max(fetched, 1)) * (total - fetched) if fetched else 0
+    line = (
+        f"[{bar}] {pct}% | {fetched}/{total} messages "
+        f"| {_fmt_time(elapsed)} elapsed | \u2248 {_fmt_time(remaining_s)} left"
+    )
+    if tty:
+        print(f"\r{line}", end="", flush=True)
+    else:
+        print(line)
+
+
+def _progress_done(total_downloaded, elapsed, output_path, pauses):
+    """Stage 5 — print final report."""
+    if _is_tty():
+        print()  # newline after progress bar
+    parts = [f"Done. {total_downloaded} messages saved"]
+    if output_path:
+        parts.append(f"to {output_path}")
+    parts.append(
+        f"Total time: {_fmt_time(elapsed)}"
+        + (f" ({pauses} rate-limit pauses)" if pauses else "")
+        + "."
+    )
+    print(". ".join(parts))
+
+
+def _fmt_time(seconds: float) -> str:
+    """Format seconds as human-readable string."""
+    if seconds < 60:
+        return f"{seconds:.0f}s"
+    m, s = divmod(int(seconds), 60)
+    return f"{m}m {s:02d}s"
+
+
+# ---------------------------------------------------------------------------
+# Estimate mode (T10, T20)
+# ---------------------------------------------------------------------------
+
+
+def _run_estimate(dialog_id: int, since: datetime | None, limit: int) -> None:
+    """Print time estimate and exit without performing backup."""
+    config = load_config()
+    client = create_client(config["api_id"], config["api_hash"], config["session"])
+    result = asyncio.run(_async_estimate(client, dialog_id, since))
+
+    if not result.ok:
+        format_error_and_exit(result.error)
+
+    total = result.payload
+    effective = min(total, limit) if limit else total
+    pages = math.ceil(effective / PAGE_SIZE) if effective else 0
+    per_page_s = (AVG_PAGE_FETCH_MS + COOLDOWN_OVERHEAD_MS) / 1000
+    total_s = pages * per_page_s
+    minutes = total_s / 60
+
+    if minutes < 1:
+        time_str = f"{total_s:.0f} seconds"
+    else:
+        time_str = f"{minutes:.0f} minutes"
+
+    print(
+        f"\u2248 {time_str} ({effective} messages, {pages} pages, "
+        f"estimated {per_page_s:.1f} s/page incl. rate-limit pauses)"
+    )
+
+
+async def _async_estimate(client, dialog_id, since):
+    """Connect, count, disconnect."""
+    async with client:
+        return await count_messages(client, dialog_id, since=since)
+
+
+# ---------------------------------------------------------------------------
+# Full backup with pagination (T19)
+# ---------------------------------------------------------------------------
+
+
+def run_backup(
+    *,
+    dialog_id: int,
+    since: str | None = None,
+    limit: int = 100,
+    output: str | None = None,
+    estimate: bool = False,
+) -> None:
+    """Main entry point for the backup command."""
+    since_dt = _parse_since(since)
+
+    if estimate:
+        _run_estimate(dialog_id, since_dt, limit)
+        return
+
+    config = load_config()
+    client = create_client(config["api_id"], config["api_hash"], config["session"])
+    output_path = Path(output) if output else None
+
+    # T11 — check output dir write permission
+    if output_path:
+        _check_output_writable(output_path)
+
+    # T22 — scan existing
+    existing_ids: set[int] = set()
+    latest_local: datetime | None = None
+    if output_path:
+        existing_ids = _scan_existing(output_path)
+        latest_local = _latest_timestamp(output_path)
+
+    result = asyncio.run(
+        _async_backup(client, dialog_id, since_dt, limit, existing_ids, latest_local, output_path)
+    )
+
+    if isinstance(result, tuple):
+        messages, pauses, elapsed = result
+    else:
+        # result is a TgResult error
+        format_error_and_exit(result.error)
+        return  # unreachable but satisfies type checker
+
+    # Serialize
+    data = [_message_to_dict(m) for m in messages]
+
+    if output_path:
+        # Merge with existing data
+        existing_data = _load_existing_data(output_path)
+        merged = _merge_messages(existing_data, data)
+        _atomic_write_json(output_path, merged)
+        _progress_done(len(data), elapsed, output_path, pauses)
+    else:
+        print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
+
+
+async def _async_backup(
+    client, dialog_id, since_dt, limit, existing_ids, latest_local, output_path,
+):
+    """Connect, paginate, disconnect. Returns (messages, pauses, elapsed) or TgResult on error."""
+    async with client:
+        # Determine total for progress
+        count_result = await count_messages(client, dialog_id, since=since_dt)
+        if not count_result.ok:
+            return count_result
+
+        total_remote = count_result.payload
+        effective_total = min(total_remote, limit) if limit else total_remote
+        new_to_fetch = max(0, effective_total - len(existing_ids))
+        pages = math.ceil(new_to_fetch / PAGE_SIZE) if new_to_fetch else 0
+
+        # T23 — progress stages 1-3
+        _progress_start(dialog_id, limit, since_dt, output_path)
+        _progress_local_scan(len(existing_ids), latest_local, new_to_fetch)
+        _progress_estimate(new_to_fetch, pages)
+
+        # Resume point: use latest_local as since if we have existing data
+        resume_since = latest_local if (existing_ids and latest_local) else since_dt
+
+        # T19 — pagination loop
+        all_messages = []
+        pauses = 0
+        tty = _is_tty()
+        start_time = time.monotonic()
+        fetched_count = 0
+        page_num = 0
+
+        remaining = new_to_fetch
+        while remaining > 0:
+            page_limit = min(PAGE_SIZE, remaining)
+            result = await read_messages(
+                client, dialog_id, since=resume_since, limit=page_limit,
+            )
+
+            if not result.ok:
+                err = result.error
+                if err.code.value == "RATE_LIMITED" and err.retry_after:
+                    pauses += 1
+                    await asyncio.sleep(err.retry_after)
+                    continue  # retry same page
+                return result  # non-recoverable error
+
+            page_msgs = result.payload
+            if not page_msgs:
+                break  # no more messages
+
+            # Filter out already-existing IDs
+            new_msgs = [m for m in page_msgs if m.id not in existing_ids]
+            all_messages.extend(new_msgs)
+            fetched_count += len(new_msgs)
+            page_num += 1
+            remaining -= len(page_msgs)
+
+            # Update resume_since to the latest message date in the page
+            if page_msgs:
+                resume_since = page_msgs[-1].date
+
+            # T23 — progress bar (stage 4)
+            elapsed = time.monotonic() - start_time
+            _progress_bar(page_num, pages, fetched_count, new_to_fetch, elapsed, tty)
+
+        elapsed = time.monotonic() - start_time
+        return (all_messages, pauses, elapsed)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _parse_since(since: str | None) -> datetime | None:
+    """Parse ISO 8601 string to datetime or return None."""
+    if since is None:
+        return None
+    try:
+        dt = datetime.fromisoformat(since)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except ValueError:
+        print(f"Error: Invalid --since timestamp: {since}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _check_output_writable(output_path: Path) -> None:
+    """T11 — check that we can write to the output directory."""
+    parent = output_path.parent
+    try:
+        parent.mkdir(parents=True, exist_ok=True)
+        # Test write permission
+        test_file = parent / ".telegram-cli-write-test"
+        test_file.touch()
+        test_file.unlink()
+    except OSError as exc:
+        print(f"Error: Output directory not writable: {exc}", file=sys.stderr)
+        sys.exit(2)
+
+
+def _message_to_dict(msg) -> dict:
+    """Convert a MessageInfo to a JSON-serializable dict."""
+    return {
+        "id": msg.id,
+        "dialog_id": msg.dialog_id,
+        "text": msg.text,
+        "date": msg.date.isoformat(),
+        "sender_id": msg.sender_id,
+        "sender_name": msg.sender_name,
+        "has_media": msg.has_media,
+    }
+
+
+def _load_existing_data(output_path: Path) -> list[dict]:
+    """Load existing JSON array from output file, or return empty list."""
+    if not output_path.is_file():
+        return []
+    try:
+        data = json.loads(output_path.read_text(encoding="utf-8"))
+        if isinstance(data, list):
+            return data
+    except (json.JSONDecodeError, OSError):
+        pass
+    return []
+
+
+def _merge_messages(existing: list[dict], new: list[dict]) -> list[dict]:
+    """Merge new messages into existing, deduplicate by ID, sort by date."""
+    by_id = {m["id"]: m for m in existing}
+    for m in new:
+        by_id[m["id"]] = m
+    return sorted(by_id.values(), key=lambda m: m.get("date", ""))

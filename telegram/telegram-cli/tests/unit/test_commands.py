@@ -1,5 +1,5 @@
 """
-Unit tests for commands: whoami, ping, get_dialogs, init, version.
+Unit tests for commands: whoami, ping, get_dialogs, init, version, send, edit, delete.
 
 All tests mock telegram-lib calls to avoid network access.
 """
@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch, AsyncMock, MagicMock
 
@@ -68,6 +69,21 @@ class _FakeDialogInfo:
         self.type = type
         self.username = username
         self.unread_count = unread_count
+
+
+class _FakeMessageInfo:
+    def __init__(self, id, date, text):
+        self.id = id
+        self.date = date
+        self.text = text
+
+
+class _FakeMediaResult:
+    def __init__(self, message_id, file_path, mime_type=None, size_bytes=None):
+        self.message_id = message_id
+        self.file_path = file_path
+        self.mime_type = mime_type
+        self.size_bytes = size_bytes
 
 
 # ---------------------------------------------------------------------------
@@ -365,3 +381,298 @@ class TestInit:
         result = _load_existing_config(cfg)
         assert result["api_id"] == 99
         assert result["api_hash"] == "hash99"
+
+
+# ---------------------------------------------------------------------------
+# Send tests
+# ---------------------------------------------------------------------------
+
+
+class TestSend:
+
+    def test_send_happy(self, capsys):
+        """Happy path: prints JSON with id, date, text."""
+        dt = datetime(2026, 6, 1, 12, 0, 0, tzinfo=timezone.utc)
+        msg = _FakeMessageInfo(id=42, date=dt, text="Hello!")
+        result = _FakeResult(payload=msg)
+
+        with (
+            patch("src.commands.send.load_config", return_value={
+                "api_id": 1, "api_hash": "a", "session": "s"
+            }),
+            patch("src.commands.send.create_client") as mock_cc,
+            patch("src.commands.send.send_message", new_callable=AsyncMock, return_value=result),
+        ):
+            mock_client = MagicMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cc.return_value = mock_client
+
+            from src.commands.send import run_send
+            run_send(dialog_id=100, text="Hello!")
+
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert data["id"] == 42
+        assert data["text"] == "Hello!"
+        assert "2026-06-01" in data["date"]
+
+    def test_send_error(self, capsys):
+        """Error exits with code 2."""
+        err = _FakeError("NOT_FOUND", "Dialog not found")
+        result = _FakeResult(error=err)
+
+        with (
+            patch("src.commands.send.load_config", return_value={
+                "api_id": 1, "api_hash": "a", "session": "s"
+            }),
+            patch("src.commands.send.create_client") as mock_cc,
+            patch("src.commands.send.send_message", new_callable=AsyncMock, return_value=result),
+        ):
+            mock_client = MagicMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cc.return_value = mock_client
+
+            from src.commands.send import run_send
+            with pytest.raises(SystemExit) as exc_info:
+                run_send(dialog_id=999, text="test")
+            assert exc_info.value.code == 2
+
+        captured = capsys.readouterr()
+        assert "NOT_FOUND" in captured.err
+
+
+# ---------------------------------------------------------------------------
+# Edit tests
+# ---------------------------------------------------------------------------
+
+
+class TestEdit:
+
+    def test_edit_happy(self, capsys):
+        """Happy path: prints updated message JSON."""
+        dt = datetime(2026, 6, 1, 13, 0, 0, tzinfo=timezone.utc)
+        msg = _FakeMessageInfo(id=55, date=dt, text="Updated!")
+        result = _FakeResult(payload=msg)
+
+        with (
+            patch("src.commands.edit.load_config", return_value={
+                "api_id": 1, "api_hash": "a", "session": "s"
+            }),
+            patch("src.commands.edit.create_client") as mock_cc,
+            patch("src.commands.edit.edit_message", new_callable=AsyncMock, return_value=result),
+        ):
+            mock_client = MagicMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cc.return_value = mock_client
+
+            from src.commands.edit import run_edit
+            run_edit(dialog_id=100, message_id=55, text="Updated!")
+
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert data["id"] == 55
+        assert data["text"] == "Updated!"
+
+    def test_edit_error(self, capsys):
+        """Error exits with code 2."""
+        err = _FakeError("PERMISSION_DENIED", "Not your message")
+        result = _FakeResult(error=err)
+
+        with (
+            patch("src.commands.edit.load_config", return_value={
+                "api_id": 1, "api_hash": "a", "session": "s"
+            }),
+            patch("src.commands.edit.create_client") as mock_cc,
+            patch("src.commands.edit.edit_message", new_callable=AsyncMock, return_value=result),
+        ):
+            mock_client = MagicMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cc.return_value = mock_client
+
+            from src.commands.edit import run_edit
+            with pytest.raises(SystemExit) as exc_info:
+                run_edit(dialog_id=100, message_id=55, text="x")
+            assert exc_info.value.code == 2
+
+        captured = capsys.readouterr()
+        assert "PERMISSION_DENIED" in captured.err
+
+
+# ---------------------------------------------------------------------------
+# Delete tests
+# ---------------------------------------------------------------------------
+
+
+class TestDelete:
+
+    def test_delete_happy(self, capsys):
+        """Happy path: prints list of deleted IDs."""
+        result = _FakeResult(payload=[10, 11, 12])
+
+        with (
+            patch("src.commands.delete.load_config", return_value={
+                "api_id": 1, "api_hash": "a", "session": "s"
+            }),
+            patch("src.commands.delete.create_client") as mock_cc,
+            patch("src.commands.delete.delete_message", new_callable=AsyncMock, return_value=result),
+        ):
+            mock_client = MagicMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cc.return_value = mock_client
+
+            from src.commands.delete import run_delete
+            run_delete(dialog_id=100, message_ids=[10, 11, 12])
+
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert data == [10, 11, 12]
+
+    def test_delete_error(self, capsys):
+        """Error exits with code 2."""
+        err = _FakeError("NOT_FOUND", "Messages not found")
+        result = _FakeResult(error=err)
+
+        with (
+            patch("src.commands.delete.load_config", return_value={
+                "api_id": 1, "api_hash": "a", "session": "s"
+            }),
+            patch("src.commands.delete.create_client") as mock_cc,
+            patch("src.commands.delete.delete_message", new_callable=AsyncMock, return_value=result),
+        ):
+            mock_client = MagicMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cc.return_value = mock_client
+
+            from src.commands.delete import run_delete
+            with pytest.raises(SystemExit) as exc_info:
+                run_delete(dialog_id=100, message_ids=[999])
+            assert exc_info.value.code == 2
+
+        captured = capsys.readouterr()
+        assert "NOT_FOUND" in captured.err
+
+
+# ---------------------------------------------------------------------------
+# Download-media tests
+# ---------------------------------------------------------------------------
+
+
+class TestDownloadMedia:
+
+    def test_download_media_happy(self, capsys):
+        """Happy path: prints JSON with file_path, mime_type, size_bytes."""
+        media = _FakeMediaResult(
+            message_id=42,
+            file_path="/tmp/photo.jpg",
+            mime_type="image/jpeg",
+            size_bytes=12345,
+        )
+        result = _FakeResult(payload=media)
+
+        with (
+            patch("src.commands.download_media.load_config", return_value={
+                "api_id": 1, "api_hash": "a", "session": "s"
+            }),
+            patch("src.commands.download_media.create_client") as mock_cc,
+            patch("src.commands.download_media.download_media", new_callable=AsyncMock, return_value=result),
+        ):
+            mock_client = MagicMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cc.return_value = mock_client
+
+            from src.commands.download_media import run_download_media
+            run_download_media(dialog_id=100, message_id=42, dest="/tmp")
+
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert data["message_id"] == 42
+        assert data["file_path"] == "/tmp/photo.jpg"
+        assert data["mime_type"] == "image/jpeg"
+        assert data["size_bytes"] == 12345
+
+    def test_download_media_error(self, capsys):
+        """Error exits with code 2."""
+        err = _FakeError("ENTITY_NOT_FOUND", "No media")
+        result = _FakeResult(error=err)
+
+        with (
+            patch("src.commands.download_media.load_config", return_value={
+                "api_id": 1, "api_hash": "a", "session": "s"
+            }),
+            patch("src.commands.download_media.create_client") as mock_cc,
+            patch("src.commands.download_media.download_media", new_callable=AsyncMock, return_value=result),
+        ):
+            mock_client = MagicMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cc.return_value = mock_client
+
+            from src.commands.download_media import run_download_media
+            with pytest.raises(SystemExit) as exc_info:
+                run_download_media(dialog_id=100, message_id=999)
+            assert exc_info.value.code == 2
+
+        captured = capsys.readouterr()
+        assert "ENTITY_NOT_FOUND" in captured.err
+
+
+# ---------------------------------------------------------------------------
+# Help tests
+# ---------------------------------------------------------------------------
+
+
+class TestHelp:
+
+    def test_help_general(self, capsys):
+        """General help prints command list."""
+        from src.commands.help_cmd import run_help
+        run_help(lang="en", command=None)
+
+        out = capsys.readouterr().out
+        assert "telegram-cli" in out
+        assert "backup" in out
+        assert "send" in out
+        assert "Available commands:" in out
+
+    def test_help_specific_command(self, capsys):
+        """Command-specific help prints usage and description."""
+        from src.commands.help_cmd import run_help
+        run_help(lang="en", command="backup")
+
+        out = capsys.readouterr().out
+        assert "backup" in out
+        assert "--since" in out
+        assert "--estimate" in out
+
+    def test_help_unknown_command(self, capsys):
+        """Unknown command exits 1."""
+        from src.commands.help_cmd import run_help
+        with pytest.raises(SystemExit) as exc_info:
+            run_help(lang="en", command="nonexistent")
+        assert exc_info.value.code == 1
+
+    def test_help_unsupported_lang(self, capsys):
+        """Unsupported language falls back to English."""
+        from src.commands.help_cmd import run_help
+        run_help(lang="xx", command=None)
+
+        out = capsys.readouterr().out
+        err = capsys.readouterr().err if hasattr(capsys, 'readouterr') else ""
+        # Should still print English help
+        assert "telegram-cli" in out
+
+    def test_help_empty_lang_fallback(self, capsys):
+        """Empty placeholder language (ru) falls back to English."""
+        from src.commands.help_cmd import run_help
+        run_help(lang="ru", command=None)
+
+        out = capsys.readouterr().out
+        # Should show English help since ru.json is empty
+        assert "telegram-cli" in out

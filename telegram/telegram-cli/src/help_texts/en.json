@@ -1,0 +1,107 @@
+{
+  "general": {
+    "title": "telegram-cli — Command-line interface for Telegram",
+    "usage": "Usage: telegram-cli <command> [options]",
+    "commands_header": "Available commands:",
+    "commands": {
+      "init": "Set up credentials and Telegram session",
+      "whoami": "Validate session and show user info",
+      "ping": "Check Telegram availability and latency",
+      "get-dialogs": "List the user's dialogs",
+      "send": "Send a text message to a dialog",
+      "edit": "Edit a previously sent message",
+      "delete": "Delete own messages",
+      "backup": "Backup message history from a dialog",
+      "download-media": "Download media from a message",
+      "version": "Show CLI and library version",
+      "help": "Show this help text"
+    },
+    "footer": "Run 'telegram-cli help <command>' for detailed help on a specific command."
+  },
+  "commands": {
+    "init": {
+      "title": "init — Set up credentials and Telegram session",
+      "usage": "telegram-cli init",
+      "description": "Interactively prompts for API ID, API hash, and phone number. Creates config.yaml and authenticates with Telegram (including 2FA if enabled)."
+    },
+    "whoami": {
+      "title": "whoami — Validate session and show user info",
+      "usage": "telegram-cli whoami",
+      "description": "Connects to Telegram, validates the current session, and prints user ID, name, username, and phone."
+    },
+    "ping": {
+      "title": "ping — Check Telegram availability",
+      "usage": "telegram-cli ping",
+      "description": "Connects to Telegram and measures round-trip latency. Prints whether the service is reachable and the latency in milliseconds."
+    },
+    "get-dialogs": {
+      "title": "get-dialogs — List dialogs",
+      "usage": "telegram-cli get-dialogs [--limit=N] [--outdir=DIR]",
+      "description": "Lists the user's dialogs (chats, groups, channels). Optionally limits the count and saves results to a JSON file in the output directory.",
+      "arguments": {
+        "--limit": "Maximum number of dialogs to return.",
+        "--outdir": "Save dialogs.json to this directory."
+      }
+    },
+    "send": {
+      "title": "send — Send a text message",
+      "usage": "telegram-cli send <dialog_id> --text=TEXT",
+      "description": "Sends a text message to the specified dialog. Prints the sent message as JSON (id, date, text).",
+      "arguments": {
+        "dialog_id": "Numeric dialog ID (use get-dialogs to find it).",
+        "--text": "The message text to send (required)."
+      }
+    },
+    "edit": {
+      "title": "edit — Edit a message",
+      "usage": "telegram-cli edit <dialog_id> <message_id> --text=TEXT",
+      "description": "Edits a previously sent message. Prints the updated message as JSON.",
+      "arguments": {
+        "dialog_id": "Dialog containing the message.",
+        "message_id": "ID of the message to edit.",
+        "--text": "Replacement text (required)."
+      }
+    },
+    "delete": {
+      "title": "delete — Delete messages",
+      "usage": "telegram-cli delete <dialog_id> <message_id> [<message_id> ...]",
+      "description": "Deletes one or more of your own messages. Prints the list of deleted message IDs as JSON.",
+      "arguments": {
+        "dialog_id": "Dialog containing the messages.",
+        "message_ids": "One or more message IDs to delete."
+      }
+    },
+    "backup": {
+      "title": "backup — Backup message history",
+      "usage": "telegram-cli backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--output=FILE] [--estimate]",
+      "description": "Retrieves messages from a dialog for full or incremental backup. Supports pagination with rate-limit handling, resumable backup, and structured progress output.",
+      "arguments": {
+        "dialog_id": "Numeric dialog ID.",
+        "--since": "ISO 8601 timestamp — only messages after this date (incremental).",
+        "--limit": "Maximum messages to retrieve (default: 100).",
+        "--output": "Write JSON output to this file instead of stdout.",
+        "--estimate": "Print approximate time estimate and exit without downloading."
+      }
+    },
+    "download-media": {
+      "title": "download-media — Download media from a message",
+      "usage": "telegram-cli download-media <dialog_id> <message_id> [--dest=DIR]",
+      "description": "Downloads the media file (photo, video, document) attached to a specific message. Prints file path, MIME type, and size.",
+      "arguments": {
+        "dialog_id": "Dialog containing the message.",
+        "message_id": "ID of the message with media.",
+        "--dest": "Target directory (default: current directory)."
+      }
+    },
+    "version": {
+      "title": "version — Show version",
+      "usage": "telegram-cli version",
+      "description": "Prints CLI and library version information as JSON."
+    },
+    "help": {
+      "title": "help — Show help",
+      "usage": "telegram-cli help [LANG] [COMMAND]",
+      "description": "Displays help text. Optionally specify a language code (en, ru, fa, tr, ar, de) and/or a command name for detailed help."
+    }
+  }
+}

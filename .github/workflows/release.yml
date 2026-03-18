@@ -1,0 +1,146 @@
+# Release workflow — builds three distribution variants of telegram-cli
+# and uploads them as GitHub Release assets (T16).
+#
+# Triggered by pushing a version tag:
+#   git tag v1.0.0
+#   git push origin v1.0.0
+#
+# Produces:
+#   - telegram-cli.pyz       (ubuntu — shiv)
+#   - telegram-cli.exe       (windows — PyInstaller)
+#   - telegram-cli-macos.zip (macos — PyInstaller)
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  # -------------------------------------------------------------------
+  # 1. Python variant (.pyz) — shiv on Ubuntu
+  # -------------------------------------------------------------------
+  build-pyz:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: telegram/telegram-cli
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install shiv
+        run: pip install shiv
+
+      - name: Install telegram-lib (local dependency)
+        run: pip install ../telegram-lib
+
+      - name: Build .pyz
+        run: |
+          mkdir -p dist
+          shiv -c telegram-cli -o dist/telegram-cli.pyz .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: telegram-cli-pyz
+          path: telegram/telegram-cli/dist/telegram-cli.pyz
+
+  # -------------------------------------------------------------------
+  # 2. Windows variant (.exe) — PyInstaller
+  # -------------------------------------------------------------------
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: telegram/telegram-cli
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller
+          pip install ../telegram-lib
+          pip install .
+
+      - name: Build .exe
+        run: pyinstaller --onefile --name telegram-cli src/__main__.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: telegram-cli-exe
+          path: telegram/telegram-cli/dist/telegram-cli.exe
+
+  # -------------------------------------------------------------------
+  # 3. macOS variant — PyInstaller + zip
+  # -------------------------------------------------------------------
+  build-macos:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: telegram/telegram-cli
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller
+          pip install ../telegram-lib
+          pip install .
+
+      - name: Build binary
+        run: pyinstaller --onefile --name telegram-cli src/__main__.py
+
+      - name: Package as zip
+        run: |
+          cd dist
+          zip telegram-cli-macos.zip telegram-cli
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: telegram-cli-macos
+          path: telegram/telegram-cli/dist/telegram-cli-macos.zip
+
+  # -------------------------------------------------------------------
+  # 4. Create GitHub Release and upload all assets
+  # -------------------------------------------------------------------
+  release:
+    needs: [build-pyz, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-assets/telegram-cli.pyz
+            release-assets/telegram-cli.exe
+            release-assets/telegram-cli-macos.zip
+          generate_release_notes: true
