@@ -28,3 +28,6 @@ Expanded `--estimate` requirements with full estimation mechanism: rate-limit-aw
 ## Version: 0.5.5
 Added T21 — atomic file writes for crash safety. All data-producing commands write to a temp file first, then rename, so interrupted backups never leave corrupt output files.
 
+## Version: 0.5.6
+Added T22 (resumable backup — scan existing output, download only the diff) and T23 (structured five-stage progress output: start, local scan result, time estimate, progress bar, final report).
+
