@@ -44,13 +44,9 @@ async def test_cmd_list_clean_out(capsys):
 
     captured = capsys.readouterr()
     # stdout must NOT contain Telethon retry log lines
-    assert "Attempt" not in captured.out, (
-        f"Telethon retry log leaked to stdout:\n{captured.out}"
-    )
+    assert "Attempt" not in captured.out, f"Telethon retry log leaked to stdout:\n{captured.out}"
     # stderr must NOT contain Telethon retry log lines
-    assert "Attempt" not in captured.err, (
-        f"Telethon retry log leaked to stderr:\n{captured.err}"
-    )
+    assert "Attempt" not in captured.err, f"Telethon retry log leaked to stderr:\n{captured.err}"
     # The exit message must be a clean error
     exit_msg = str(exc_info.value.code)
     assert "Error [NETWORK_ERROR]:" in exit_msg
@@ -88,9 +84,5 @@ async def test_cmd_list_no_logs(capsys):
 
     captured = capsys.readouterr()
     # Neither stdout nor stderr should contain Telethon retry noise
-    assert "Attempt" not in captured.out, (
-        f"Telethon retry log leaked to stdout:\n{captured.out}"
-    )
-    assert "Attempt" not in captured.err, (
-        f"Telethon retry log leaked to stderr:\n{captured.err}"
-    )
+    assert "Attempt" not in captured.out, f"Telethon retry log leaked to stdout:\n{captured.out}"
+    assert "Attempt" not in captured.err, f"Telethon retry log leaked to stderr:\n{captured.err}"

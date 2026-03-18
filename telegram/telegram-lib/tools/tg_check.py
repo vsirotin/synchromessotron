@@ -159,8 +159,10 @@ def main() -> None:
         asyncio.run(cmd_list())
     elif sys.argv[1] == "test":
         if len(sys.argv) < 3:
-            sys.exit("Usage: python3 tools/tg_check.py test <dialog_id>\n"
-                     "Example: python3 tools/tg_check.py test -1001234567890")
+            sys.exit(
+                "Usage: python3 tools/tg_check.py test <dialog_id>\n"
+                "Example: python3 tools/tg_check.py test -1001234567890"
+            )
         asyncio.run(cmd_test(sys.argv[2]))
 
 

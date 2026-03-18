@@ -84,8 +84,9 @@ class TestGetDialogs:
 
     @pytest.mark.asyncio
     async def test_get_dialogs_rate_limit(self):
-        from src.dialogs import get_dialogs
         from telethon.errors import FloodWaitError
+
+        from src.dialogs import get_dialogs
 
         client = _mock_client()
 

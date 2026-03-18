@@ -24,7 +24,6 @@ from src.dialogs import get_dialogs
 from src.health import check_availability, validate_session
 from src.media import download_media
 from src.messages import delete_message, edit_message, read_messages, send_message
-from src.version import get_version
 from src.models import (
     DialogInfo,
     ErrorCode,
@@ -36,6 +35,7 @@ from src.models import (
     TgResult,
     VersionInfo,
 )
+from src.version import get_version
 
 __all__ = [
     # factory

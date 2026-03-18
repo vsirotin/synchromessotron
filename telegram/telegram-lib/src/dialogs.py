@@ -92,8 +92,18 @@ def _map_exception(exc: Exception) -> TgError:
     if isinstance(exc, UserDeactivatedBanError):
         return TgError(ErrorCode.AUTH_FAILED, "User account is deactivated or banned")
     if isinstance(exc, MessageNotModifiedError):
-        return TgError(ErrorCode.NOT_MODIFIED, "Message content was not modified (new text is identical to current)")
-    if isinstance(exc, (MessageAuthorRequiredError, ChatWriteForbiddenError, MessageDeleteForbiddenError)):
+        return TgError(
+            ErrorCode.NOT_MODIFIED,
+            "Message content was not modified (new text is identical to current)",
+        )
+    if isinstance(
+        exc,
+        (
+            MessageAuthorRequiredError,
+            ChatWriteForbiddenError,
+            MessageDeleteForbiddenError,
+        ),
+    ):
         return TgError(ErrorCode.PERMISSION_DENIED, str(exc))
     if isinstance(exc, MessageIdInvalidError):
         return TgError(ErrorCode.ENTITY_NOT_FOUND, f"Message not found: {exc}")

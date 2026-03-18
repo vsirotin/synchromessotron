@@ -4,8 +4,6 @@ Unit tests for src/client.py — create_client.
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
 from src.client import create_client
 
 

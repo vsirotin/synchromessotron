@@ -5,8 +5,7 @@ Unit tests for src/media.py — download_media (F6).
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, PropertyMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 

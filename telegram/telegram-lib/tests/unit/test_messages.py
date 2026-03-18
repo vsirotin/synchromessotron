@@ -170,15 +170,14 @@ class TestSendMessage:
 
     @pytest.mark.asyncio
     async def test_send_message_perm_deny(self):
-        from src.messages import send_message
         from telethon.errors import ChatWriteForbiddenError
+
+        from src.messages import send_message
 
         client = _mock_client()
         entity = _mock_entity()
         client.get_entity = AsyncMock(return_value=entity)
-        client.send_message = AsyncMock(
-            side_effect=ChatWriteForbiddenError(request=None)
-        )
+        client.send_message = AsyncMock(side_effect=ChatWriteForbiddenError(request=None))
 
         result = await send_message(client, 123, "Hi")
 
@@ -223,15 +222,14 @@ class TestEditMessage:
 
     @pytest.mark.asyncio
     async def test_edit_message_no_change(self):
-        from src.messages import edit_message
         from telethon.errors import MessageNotModifiedError
+
+        from src.messages import edit_message
 
         client = _mock_client()
         entity = _mock_entity()
         client.get_entity = AsyncMock(return_value=entity)
-        client.edit_message = AsyncMock(
-            side_effect=MessageNotModifiedError(request=None)
-        )
+        client.edit_message = AsyncMock(side_effect=MessageNotModifiedError(request=None))
 
         result = await edit_message(client, 123, 1, "Same text")
 
@@ -300,15 +298,14 @@ class TestDeleteMessage:
 
     @pytest.mark.asyncio
     async def test_delete_message_perm_deny(self):
-        from src.messages import delete_message
         from telethon.errors import MessageDeleteForbiddenError
+
+        from src.messages import delete_message
 
         client = _mock_client()
         entity = _mock_entity()
         client.get_entity = AsyncMock(return_value=entity)
-        client.delete_messages = AsyncMock(
-            side_effect=MessageDeleteForbiddenError(request=None)
-        )
+        client.delete_messages = AsyncMock(side_effect=MessageDeleteForbiddenError(request=None))
 
         result = await delete_message(client, 123, [1])
 
@@ -398,15 +395,14 @@ class TestCountMessages:
 
     @pytest.mark.asyncio
     async def test_count_messages_rate_limit(self):
-        from src.messages import count_messages
         from telethon.errors import FloodWaitError
+
+        from src.messages import count_messages
 
         client = _mock_client()
         entity = _mock_entity()
         client.get_entity = AsyncMock(return_value=entity)
-        client.get_messages = AsyncMock(
-            side_effect=FloodWaitError(request=None, capture=20)
-        )
+        client.get_messages = AsyncMock(side_effect=FloodWaitError(request=None, capture=20))
 
         result = await count_messages(client, 123)
 

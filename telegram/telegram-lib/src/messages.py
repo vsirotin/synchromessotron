@@ -26,10 +26,7 @@ def _to_message_info(msg, dialog_id: int) -> MessageInfo:
     sender_id = None
     if msg.sender:
         sender_id = msg.sender_id
-        sender_name = (
-            getattr(msg.sender, "first_name", None)
-            or getattr(msg.sender, "title", None)
-        )
+        sender_name = getattr(msg.sender, "first_name", None) or getattr(msg.sender, "title", None)
     return MessageInfo(
         id=msg.id,
         dialog_id=dialog_id,

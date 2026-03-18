@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Generic, TypeVar
 
 T = TypeVar("T")
@@ -25,7 +25,8 @@ T = TypeVar("T")
 # Error codes
 # ---------------------------------------------------------------------------
 
-class ErrorCode(str, Enum):
+
+class ErrorCode(StrEnum):
     """Standardised error codes returned by telegram-lib (T3)."""
 
     RATE_LIMITED = "RATE_LIMITED"
@@ -41,6 +42,7 @@ class ErrorCode(str, Enum):
 # ---------------------------------------------------------------------------
 # Result / Error container (T6)
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class TgError:
@@ -85,6 +87,7 @@ class TgResult(Generic[T]):
 # ---------------------------------------------------------------------------
 # Payload DTOs (T7) — only the fields the caller actually needs
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class DialogInfo:

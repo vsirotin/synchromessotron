@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from src.models import TgError, TgResult, VersionInfo, ErrorCode
+from src.models import ErrorCode, TgError, TgResult, VersionInfo
 
 logger = logging.getLogger("telegram_lib")
 
