@@ -21,3 +21,6 @@ Added version information function (F9):
 - Added F9 requirement to telegram-lib-requirements.md and telegram-cli-requirements.md.
 - Test count increased from 41 to 45.
 
+## Version: 1.2.1
+Added F10 requirement: `count_messages()` — lightweight metadata query to count messages in a dialog without downloading content. Needed by telegram-cli `--estimate` to predict backup duration.
+

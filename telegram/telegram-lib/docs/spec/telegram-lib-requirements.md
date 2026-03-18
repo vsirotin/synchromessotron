@@ -19,6 +19,7 @@ The library provides the following capabilities for Telegram dialogs, groups, an
 - F7. Checking the availability of Telegram.
 - F8. Validating the current (given) user session.
 - F9. Returning the library version as a JSON-serialisable object with the same structure as `src/version.yaml` (fields: `version`, `build`, `datetime`).
+- F10. Counting the total number of messages in a dialog (optionally filtered by a timestamp) without downloading message content. This is a lightweight metadata query used by callers (e.g. telegram-cli `--estimate`) to predict operation duration. Implemented via Telethon's `client.get_messages(entity, limit=0)` → `.total`.
 
 ## Technical Requirements
 
