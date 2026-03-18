@@ -31,7 +31,6 @@ You do not need to be a programmer to use this tool. Just follow the steps below
 | `delete` | Delete own messages |
 | `download-media` | Download a media file from a message |
 | `help` | Show help in your language |
-| `howlong` | Estimate duration of a long-running command |
 | `version` | Show version information |
 
 > **What is a "dialog"?** In Telegram, a "dialog" means any conversation — a private chat with a person, a group, or a channel.
@@ -383,6 +382,7 @@ backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--outdir=DIR] [--media] [--f
 | `--links` | off | Also save link previews and URLs. |
 | `--gifs` | off | Also download GIF animations. |
 | `--members` | off | Also save dialog participant list. |
+| `--estimate` | off | Print a time estimate instead of running the backup. No data is written. |
 
 By default, only messages are saved (`messages.json` + `messages.md`). Add content flags to include additional data.
 
@@ -413,6 +413,14 @@ By default, only messages are saved (`messages.json` + `messages.md`). Add conte
 ```
 ✓ 12 messages saved to synchromessotron/Telegram_777000/2026/03/
 ```
+
+**Expected result** (with `--estimate`):
+
+```
+≈ 12 minutes (5000 messages, estimated 2.4 ms per message)
+```
+
+The estimate is approximate — actual time depends on network speed and Telegram rate limits. No data is written when `--estimate` is used.
 
 Possible errors: `ENTITY_NOT_FOUND`, `NETWORK_ERROR`, `PERMISSION_DENIED`, `RATE_LIMITED`. See [Error Handling](#error-handling) below.
 
@@ -645,46 +653,10 @@ Commands:
   delete          Delete own messages
   download-media  Download media from a message
   help            Show this help
-  howlong         Estimate duration of a command
   version         Show version information
 
 Run 'telegram-cli help <lang> <command>' for details.
 ```
-
----
-
-### howlong — Estimate duration of a long-running command
-
-Some commands (e.g. `backup`, `download-media`) may take a long time depending on the amount of data. Use `howlong` to get an estimate before running them.
-
-```
-howlong <command> [ARGS...]
-```
-
-**Parameters:**
-
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `<command>` | yes | The command to estimate (`backup`, `download-media`, `get-dialogs`). |
-| `ARGS` | no | The same arguments you would pass to the actual command. |
-
-**Call examples:**
-
-| Variant | Command |
-|---------|---------|
-| **Windows** | `telegram-cli howlong backup -1001234567890 --limit=5000` |
-| **macOS** | `./telegram-cli howlong backup -1001234567890 --limit=5000` |
-| **Python** | `python3 telegram-cli.pyz howlong backup -1001234567890 --limit=5000` |
-
-**Expected result:**
-
-```
-≈ 12 minutes (5000 messages, estimated 2.4 ms per message)
-```
-
-The estimate is approximate — actual time depends on network speed and Telegram rate limits.
-
-Possible errors: `NETWORK_ERROR`, unsupported command. See [Error Handling](#error-handling) below.
 
 ---
 

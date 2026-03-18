@@ -73,7 +73,7 @@ Retrieve messages from a dialog for full or incremental backup.
 **Signature:**
 
 ```
-telegram-cli backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--output=FILE]
+telegram-cli backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--output=FILE] [--estimate]
 ```
 
 **Arguments:**
@@ -84,6 +84,7 @@ telegram-cli backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--output=FILE]
 | `--since` | no | ISO 8601 string | If set, only messages strictly after this timestamp are returned (incremental). If omitted, the most recent messages are returned (full). |
 | `--limit` | no | int | Maximum number of messages to return. Default: `100`. |
 | `--output` | no | file path | Write JSON output to this file instead of stdout. |
+| `--estimate` | no | flag | Instead of running the backup, print an approximate time estimate and exit. The tool may connect briefly to Telegram to determine data volume. |
 
 **Examples:**
 
@@ -96,6 +97,9 @@ telegram-cli backup -1001234567890 --since="2026-03-01T00:00:00" --output=increm
 
 # Quick preview — last 10 messages to stdout
 telegram-cli backup -1001234567890 --limit=10
+
+# Estimate how long a backup would take
+telegram-cli backup -1001234567890 --limit=5000 --estimate
 ```
 
 **Output:** JSON array of message objects (id, dialog_id, text, date, sender_name, has_media).
@@ -515,50 +519,6 @@ telegram-cli help ru backup
 
 ---
 
-### F12 — Estimate duration of long-running commands
-
-Provide an approximate time estimate for potentially long-running commands before the user commits to running them.
-
-**Signature:**
-
-```
-telegram-cli howlong <command> [ARGS...]
-```
-
-**Arguments:**
-
-| Argument | Required | Type | Description |
-|----------|----------|------|-------------|
-| `command` | yes | string | The command to estimate. Supported: `backup`, `download-media`, `get-dialogs`. |
-| `ARGS` | no | mixed | The same arguments that would be passed to the actual command (e.g. `<dialog_id> --limit=5000`). Used to refine the estimate. |
-
-**Examples:**
-
-```bash
-telegram-cli howlong backup -1001234567890 --limit=5000
-telegram-cli howlong download-media -1001234567890 42
-telegram-cli howlong get-dialogs
-```
-
-**Output (success):** A human-readable estimate, e.g.:
-
-```
-≈ 12 minutes (5000 messages, estimated 2.4 ms per message)
-```
-
-**Estimation method:** The command may connect to Telegram briefly to determine the data volume (e.g. total number of messages in a dialog) and then calculate the estimate based on known per-item processing time and Telegram rate limits.
-
-**Possible errors:**
-
-| Error code | When it happens |
-|------------|------------------|
-| `INTERNAL_ERROR` | The specified command does not support time estimation (e.g. `send`, `edit`). |
-| `ENTITY_NOT_FOUND` | The dialog ID does not exist. |
-| `NETWORK_ERROR` | Cannot connect to determine data volume. |
-| `SESSION_INVALID` | Session has expired. |
-
----
-
 ## Technical Requirements
 
 - T1. Credentials (api_id, api_hash, phone, session) are loaded from a `config.yaml` file located in the same directory as the executable. The file uses YAML format with a flat `telegram` section.
@@ -570,7 +530,7 @@ telegram-cli howlong get-dialogs
 - T7. The CLI includes a built-in `init` command that interactively generates a session string and writes it to `config.yaml`, so users do not need separate tooling.
 - T8. The CLI requires Python ≥ 3.11 for the `.pyz` variant. The Windows (`.exe`) and macOS variants do not require Python. The `init` command and README provide platform-specific guidance.
 - T9. Help texts are bundled for six languages: English (`en`), Russian (`ru`), Persian (`fa`), Turkish (`tr`), Arabic (`ar`), German (`de`). Texts are stored as resource files inside the package and shipped within all distribution variants. English is the default fallback.
-- T10. The `howlong` command connects to Telegram only when necessary (e.g. to count messages in a dialog). It must not modify any data.
+- T10. The `--estimate` flag connects to Telegram only when necessary (e.g. to count messages in a dialog). It must not modify any data.
 - T11. Before writing to the output directory, the CLI checks that the directory can be created and is writable. If the check fails, the command exits with `PERMISSION_DENIED` (exit code 2).
 - T12. Dialog sub-directory names follow the pattern `<name_prefix>_<abs_id>`: first 10 characters of the dialog name (spaces → `_`, shorter names used in full), underscore, absolute value of the dialog ID.
 - T13. Time-based directory splitting uses the `split_threshold` setting from `config.yaml` (default: `50`). The hierarchy levels are: year → month → day → hour → minute. Splitting is applied recursively; messages are stored only at the leaf level in `messages.json` (full data) and `messages.md` (author, timestamp, text).
