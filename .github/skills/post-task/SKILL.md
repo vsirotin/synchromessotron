@@ -20,7 +20,7 @@ Update the file `<project-root>/src/version.yaml` (if it exists). Use semantic v
 
 ### 2. Update release notes
 
-Append the new version entry **after** the existing content in `<project-root>/release-notes.md` (if it exists). Include the remembered version number and a short explanation of the version update. Do not reorder or overwrite previous entries.
+Insert the new version entry **at the beginning** (after the header, at line 3) in `<project-root>/release-notes.md` (if it exists). Include the remembered version number and a short explanation of the version update. Latest release appears first, oldest releases appear last. Do not reorder or overwrite previous entries.
 
 ### 3. Write commit text proposal
 
