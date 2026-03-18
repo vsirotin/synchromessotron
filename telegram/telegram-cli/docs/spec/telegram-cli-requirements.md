@@ -84,7 +84,7 @@ telegram-cli backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--output=FILE] 
 | `--since` | no | ISO 8601 string | If set, only messages strictly after this timestamp are returned (incremental). If omitted, the most recent messages are returned (full). |
 | `--limit` | no | int | Maximum number of messages to return. Default: `100`. |
 | `--output` | no | file path | Write JSON output to this file instead of stdout. |
-| `--estimate` | no | flag | Instead of running the backup, print an approximate time estimate and exit. The tool may connect briefly to Telegram to determine data volume. |
+| `--estimate` | no | flag | Instead of running the backup, print an approximate time estimate and exit. Connects briefly to Telegram to determine data volume (see estimation mechanism below). |
 
 **Examples:**
 
@@ -103,6 +103,27 @@ telegram-cli backup -1001234567890 --limit=5000 --estimate
 ```
 
 **Output:** JSON array of message objects (id, dialog_id, text, date, sender_name, has_media).
+
+**Estimation mechanism (`--estimate`):**
+
+The Telegram API enforces rate limits: when too many requests are made in a short time, the server responds with a `FloodWaitError` containing a cooldown period (typically 5–30 seconds). This makes large backup durations hard to predict without understanding the underlying rate-limit behaviour.
+
+When `--estimate` is passed:
+
+1. The CLI calls `count_messages()` (telegram-lib) to obtain the total number of messages matching the query (dialog, `--since`, `--limit`) **without downloading message content**. This is a single lightweight API call using Telethon's `client.get_messages(entity, limit=0)` → `.total`.
+2. The number of API pages is calculated: `pages = ceil(min(total, limit) / page_size)`.
+3. The estimated duration is: `pages × (avg_page_fetch_ms + expected_cooldown_overhead_ms)`.
+   - `avg_page_fetch_ms` is an empirical constant (the average time to fetch one page of messages excluding cooldown).
+   - `expected_cooldown_overhead_ms` accounts for Telegram rate-limit pauses. Since Telegram's rate limits are not publicly documented and vary by account, this is a conservative heuristic.
+4. The result is printed as a human-readable estimate and the CLI exits without performing the actual backup.
+
+**Example `--estimate` output:**
+
+```
+≈ 12 minutes (5000 messages, 50 pages, estimated 14.4 s/page incl. rate-limit pauses)
+```
+
+The estimate is approximate — actual duration depends on network speed, server load, and per-account rate limits.
 
 **Possible errors:**
 
@@ -530,7 +551,7 @@ telegram-cli help ru backup
 - T7. The CLI includes a built-in `init` command that interactively generates a session string and writes it to `config.yaml`, so users do not need separate tooling.
 - T8. The CLI requires Python ≥ 3.11 for the `.pyz` variant. The Windows (`.exe`) and macOS variants do not require Python. The `init` command and README provide platform-specific guidance.
 - T9. Help texts are bundled for six languages: English (`en`), Russian (`ru`), Persian (`fa`), Turkish (`tr`), Arabic (`ar`), German (`de`). Texts are stored as resource files inside the package and shipped within all distribution variants. English is the default fallback.
-- T10. The `--estimate` flag connects to Telegram only when necessary (e.g. to count messages in a dialog). It must not modify any data.
+- T10. The `--estimate` flag connects to Telegram only when necessary (a single API call to count messages). It must not modify any data. The estimation uses `count_messages()` from telegram-lib — a lightweight call that returns the total message count without downloading content.
 - T11. Before writing to the output directory, the CLI checks that the directory can be created and is writable. If the check fails, the command exits with `PERMISSION_DENIED` (exit code 2).
 - T12. Dialog sub-directory names follow the pattern `<name_prefix>_<abs_id>`: first 10 characters of the dialog name (spaces → `_`, shorter names used in full), underscore, absolute value of the dialog ID.
 - T13. Time-based directory splitting uses the `split_threshold` setting from `config.yaml` (default: `50`). The hierarchy levels are: year → month → day → hour → minute. Splitting is applied recursively; messages are stored only at the leaf level in `messages.json` (full data) and `messages.md` (author, timestamp, text).
@@ -539,6 +560,8 @@ telegram-cli help ru backup
 - T16. A GitHub Actions workflow (`release.yml`) builds the Windows `.exe` and macOS binary using PyInstaller on the respective runner OS (`windows-latest`, `macos-latest`). The `.pyz` is built with shiv on `ubuntu-latest`. All three artifacts are uploaded as release assets when a version tag (e.g. `v0.5.0`) is pushed.
 - T17. The Windows `.exe` is not code-signed. On first run, Windows SmartScreen may warn the user. The README documents how to proceed ("More info" → "Run anyway").
 - T18. The macOS binary is not notarized. On first run, macOS Gatekeeper may block execution. The README documents the one-time setup: `chmod +x telegram-cli` and `xattr -d com.apple.quarantine telegram-cli`.
+- T19. The `backup` command implements a cooldown-aware pagination loop. It fetches messages in pages (using telegram-lib `read_messages`). When a page request returns `RATE_LIMITED` with `retry_after`, the CLI waits the specified number of seconds and retries automatically. Progress is reported to stdout (e.g. `Page 3/50 — fetched 300 messages`). This loop is required both for actual backup and for accurate `--estimate` calibration.
+- T20. The `--estimate` implementation depends on a `count_messages()` function in telegram-lib (not yet implemented). This function must be added to telegram-lib before `--estimate` can be coded. See telegram-lib requirements for the corresponding update.
 
 ## Configuration File
 
