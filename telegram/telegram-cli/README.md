@@ -715,6 +715,12 @@ No parameters.
 
 ---
 
+## For Developers
+
+If you are a developer contributing to telegram-cli — building executables, running tests, or working on the codebase — see [DEVELOPMENT.md](DEVELOPMENT.md).
+
+---
+
 ## Manual Tests
 
 ### Test: No network connection
