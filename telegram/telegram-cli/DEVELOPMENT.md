@@ -6,89 +6,122 @@ This document is for developers who contribute to or build telegram-cli. For end
 
 ## 1. Building Executables
 
-telegram-cli is distributed in three variants. Each has its own build process.
+telegram-cli is distributed in three variants. Build scripts live in `tools/` and are used by both the CI workflow and local builds.
 
-### 1.1 Python variant (.pyz) — shiv
+| Variant | Script | Output | Platform |
+|---------|--------|--------|----------|
+| Python archive | `tools/build_pyz.sh` | `dist/telegram-cli.pyz` | Any (needs Python ≥ 3.11) |
+| Windows binary | `tools/build_windows.sh` | `dist/telegram-cli.exe` | Windows |
+| macOS binary | `tools/build_macos.sh` | `dist/telegram-cli-macos.zip` | macOS |
 
-The `.pyz` archive bundles all Python dependencies into a single file. Users need Python ≥ 3.11 to run it.
+### 1.1 Local build
 
-**Prerequisites:** `pip install shiv`
-
-```bash
-cd telegram/telegram-cli
-
-shiv -c telegram-cli -o dist/telegram-cli.pyz .
-```
-
-The entry point is `src.__main__:main` (via `__main__.py`). shiv reads the project's `pyproject.toml` to resolve dependencies.
-
-### 1.2 Windows variant (.exe) — PyInstaller
-
-**Prerequisites:** A Windows machine (or the GitHub Actions `windows-latest` runner) with Python ≥ 3.11 and `pip install pyinstaller`.
-
-```powershell
-cd telegram\telegram-cli
-
-pyinstaller --onefile --name telegram-cli src\__main__.py
-```
-
-This produces `dist\telegram-cli.exe`. The binary is self-contained — no Python installation is needed on the target machine.
-
-> **Note:** The `.exe` is not code-signed. On first run, Windows SmartScreen will show a warning. See README.md Step 1 for the user-facing instructions.
-
-### 1.3 macOS variant — PyInstaller
-
-**Prerequisites:** A macOS machine (or the GitHub Actions `macos-latest` runner) with Python ≥ 3.11 and `pip install pyinstaller`.
+Run the script that matches your platform from the `telegram/telegram-cli` directory:
 
 ```bash
 cd telegram/telegram-cli
 
-pyinstaller --onefile --name telegram-cli src/__main__.py
+# Python archive (works on any OS):
+bash tools/build_pyz.sh
+
+# macOS native binary (macOS only):
+bash tools/build_macos.sh
+
+# Windows native binary (Windows only — use Git Bash or WSL):
+bash tools/build_windows.sh
 ```
 
-This produces `dist/telegram-cli` (extensionless binary). Package it for distribution:
+Each script installs its own build tools (shiv or PyInstaller), installs `telegram-lib` from the sibling directory, builds the artifact into `dist/`, and prints a smoke-test command.
+
+Smoke-test examples:
 
 ```bash
-cd dist
-zip telegram-cli-macos.zip telegram-cli
+python3 dist/telegram-cli.pyz version       # Python archive
+dist/telegram-cli version                    # macOS
+dist\telegram-cli.exe version                # Windows
 ```
 
-> **Note:** The binary is not notarized. On first run, macOS Gatekeeper blocks it. See README.md Step 1 for `chmod +x` / `xattr` instructions.
+`dist/` is in `.gitignore` and must never be committed.
 
-### 1.4 CI release workflow (release.yml)
+### 1.2 What each script does (step by step)
 
-All three variants are built automatically by the GitHub Actions workflow `.github/workflows/release.yml`. The workflow is triggered by pushing a version tag:
+All three scripts follow the same pattern:
+
+1. **Install build tool** — `pip install shiv` (for `.pyz`) or `pip install pyinstaller` (for native binaries).
+2. **Install telegram-lib** — `pip install ../telegram-lib` so the dependency is available.
+3. **Install telegram-cli itself** — `pip install .` (reads `pyproject.toml` for metadata and dependencies).
+4. **Build the artifact**:
+   - *shiv* bundles all Python packages into a single `.pyz` file. The entry point `src.__main__:main` is declared in `pyproject.toml → [project.scripts]`. Users need Python ≥ 3.11 to run the `.pyz`.
+   - *PyInstaller* freezes the Python interpreter + all packages into a single native executable. No Python installation is needed on the target machine.
+5. **Package** (macOS only) — zips the binary for easier distribution.
+
+> **Windows note:** The `.exe` is not code-signed. On first run, Windows SmartScreen shows a warning. See README.md for user instructions.
+>
+> **macOS note:** The binary is not notarized. On first run, macOS Gatekeeper blocks it. See README.md for `chmod +x` / `xattr` instructions.
+
+### 1.3 CI release workflow
+
+The GitHub Actions workflow `.github/workflows/release.yml` calls the same `tools/build_*.sh` scripts on three runners (ubuntu, windows, macos). It is triggered when you push a version tag.
+
+#### How to trigger a release
+
+**Terminal:**
 
 ```bash
-git tag v0.5.2
-git push origin v0.5.2
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
-**The same via VS Code UI:**
+**VS Code UI:**
 
 1. Open the **Source Control** panel (⌃⇧G / Ctrl+Shift+G).
 2. Commit and push all changes.
-3. Open the **Command Palette** (⌘⇧P / Ctrl+Shift+P) → type **Git: Create Tag** → enter the tag name (e.g. `v0.5.2`).
+3. Open the **Command Palette** (⌘⇧P / Ctrl+Shift+P) → type **Git: Create Tag** → enter the tag name (e.g. `v1.0.0`).
 4. Open the **Command Palette** again → **Git: Push Tags**.
 
-The workflow:
+#### How to monitor the build
 
-1. **ubuntu-latest** — builds `telegram-cli.pyz` with shiv.
-2. **windows-latest** — builds `telegram-cli.exe` with PyInstaller.
-3. **macos-latest** — builds `telegram-cli`, zips it to `telegram-cli-macos.zip`.
+After pushing the tag:
 
-All three artifacts are uploaded as assets to the GitHub Release created for the tag.
+1. Go to the repository on GitHub: **https://github.com/vsirotin/synchromessotron**.
+2. Click the **Actions** tab.
+3. You will see a workflow run named **Release** with the tag name. Click it.
+4. Inside you see four jobs: **build-pyz**, **build-windows**, **build-macos**, **release**.
+5. Click any job to see its real-time log. Each step (Set up Python, Build, Upload) shows its output. If a step fails, it turns red and the log shows the error.
 
-### 1.5 Local builds
+> **Tip:** You can also click the **Actions** tab directly from VS Code if you have the [GitHub Actions extension](https://marketplace.visualstudio.com/items?itemName=GitHub.vscode-github-actions) installed.
 
-For local testing, build artifacts go into `dist/`. This directory is in `.gitignore` and must never be committed.
+#### How to download the release artifacts
 
-```bash
-# Quick smoke test after a local build:
-dist/telegram-cli version       # macOS
-dist\telegram-cli.exe version   # Windows
-python3 dist/telegram-cli.pyz version  # Python
-```
+When all four jobs finish green:
+
+1. Go to the repository → **Releases** (right sidebar, or direct link: `https://github.com/vsirotin/synchromessotron/releases`).
+2. The latest release shows the tag name and three downloadable assets:
+   - `telegram-cli.pyz`
+   - `telegram-cli.exe`
+   - `telegram-cli-macos.zip`
+3. Click on an asset to download it.
+
+You can also download intermediate build artifacts (before the release job runs) from the workflow run page → **Artifacts** section at the bottom.
+
+#### How to delete a bad release
+
+If a release contains broken artifacts or was created by mistake:
+
+1. Go to **Releases** → click the release you want to remove.
+2. Click the **Delete** button (top-right, next to "Edit").
+3. Confirm the deletion. This removes the release page and its assets but does **not** delete the Git tag.
+4. To also delete the tag (so you can re-use the same version number):
+
+   **Terminal:**
+   ```bash
+   git tag -d v1.0.0                  # delete local tag
+   git push origin --delete v1.0.0    # delete remote tag
+   ```
+
+   **VS Code:** There is no built-in UI for deleting tags — use the terminal.
+
+5. After fixing the issue, create the tag again and push it to re-trigger the workflow.
 
 ---
 
@@ -130,6 +163,10 @@ telegram/telegram-cli/
 │   ├── images/               # Screenshots for README
 │   └── spec/
 │       └── telegram-cli-requirements.md   # Functional & technical requirements
+├── tools/
+│   ├── build_pyz.sh          # Build .pyz (shiv, cross-platform)
+│   ├── build_windows.sh      # Build .exe (PyInstaller, Windows)
+│   └── build_macos.sh        # Build macOS binary + zip (PyInstaller)
 ├── src/
 │   ├── __init__.py           # Package docstring
 │   ├── __main__.py           # Entry point: python3 -m src / .pyz
@@ -139,17 +176,32 @@ telegram/telegram-cli/
 │   ├── version.py            # Reads version.yaml (F9)
 │   ├── version.yaml          # Current version, build, datetime
 │   ├── _lib.py               # Adapter for importing telegram-lib (see §6)
+│   ├── help_texts/           # i18n help text JSON files (T9)
+│   │   ├── en.json
+│   │   └── ...               # ru, fa, tr, ar, de (placeholders)
 │   └── commands/
 │       ├── __init__.py
 │       ├── init_cmd.py       # init command (F10)
 │       ├── whoami.py         # whoami command (F8)
 │       ├── ping.py           # ping command (F7)
 │       ├── get_dialogs.py    # get-dialogs command (F5)
+│       ├── send.py           # send command (F2)
+│       ├── edit.py           # edit command (F3)
+│       ├── delete.py         # delete command (F4)
+│       ├── backup.py         # backup command (F1)
+│       ├── download_media.py # download-media command (F6)
+│       ├── help_cmd.py       # help command (F11)
 │       └── version_cmd.py    # version command (F9)
 └── tests/
     └── unit/
         ├── __init__.py
-        └── test_timeout.py   # (+ other test files)
+        ├── test_cli.py       # Parser + dispatch tests
+        ├── test_commands.py  # Command handler tests
+        ├── test_backup.py    # Backup command tests
+        ├── test_config.py    # Config loader tests
+        ├── test_errors.py    # Error formatting tests
+        ├── test_timeout.py   # Timeout handling tests
+        └── test_version.py   # Version command tests
 ```
 
 ---
@@ -190,14 +242,12 @@ testpaths = ["tests"]
 
 The repository has a monorepo CI workflow at `.github/workflows/quality-gate.yml`. It detects which sub-projects have changed files and runs their test suites.
 
-telegram-cli is registered (commented out) in that workflow. To activate it, uncomment the `telegram-cli` sections in the `detect-changes` job outputs and filters, and add the `telegram-cli` job block.
+telegram-cli is registered in that workflow. On every push that touches files under `telegram/telegram-cli/`, the CI job:
 
-The telegram-cli CI job should:
-
-1. Check out the repository.
-2. Set up Python 3.11.
-3. `pip install -e ".[dev]"` and `pip install -e ../telegram-lib`.
-4. Run `pytest --tb=short`.
+1. Checks out the repository.
+2. Sets up Python 3.11.
+3. `pip install -e ../telegram-lib` and `pip install -e ".[dev]"`.
+4. Runs `pytest --tb=short`.
 
 ---
 

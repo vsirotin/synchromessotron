@@ -9,6 +9,9 @@
 #   - telegram-cli.pyz       (ubuntu — shiv)
 #   - telegram-cli.exe       (windows — PyInstaller)
 #   - telegram-cli-macos.zip (macos — PyInstaller)
+#
+# Build logic lives in telegram/telegram-cli/tools/build_*.sh so the
+# same scripts can be used for local builds.
 
 name: Release
 
@@ -26,9 +29,6 @@ jobs:
   # -------------------------------------------------------------------
   build-pyz:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: telegram/telegram-cli
     steps:
       - uses: actions/checkout@v4
 
@@ -37,16 +37,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install shiv
-        run: pip install shiv
-
-      - name: Install telegram-lib (local dependency)
-        run: pip install ../telegram-lib
-
       - name: Build .pyz
-        run: |
-          mkdir -p dist
-          shiv -c telegram-cli -o dist/telegram-cli.pyz .
+        run: bash telegram/telegram-cli/tools/build_pyz.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -59,9 +51,6 @@ jobs:
   # -------------------------------------------------------------------
   build-windows:
     runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: telegram/telegram-cli
     steps:
       - uses: actions/checkout@v4
 
@@ -70,14 +59,9 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: |
-          pip install pyinstaller
-          pip install ../telegram-lib
-          pip install .
-
       - name: Build .exe
-        run: pyinstaller --onefile --name telegram-cli src/__main__.py
+        shell: bash
+        run: bash telegram/telegram-cli/tools/build_windows.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -90,9 +74,6 @@ jobs:
   # -------------------------------------------------------------------
   build-macos:
     runs-on: macos-latest
-    defaults:
-      run:
-        working-directory: telegram/telegram-cli
     steps:
       - uses: actions/checkout@v4
 
@@ -101,19 +82,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: |
-          pip install pyinstaller
-          pip install ../telegram-lib
-          pip install .
-
-      - name: Build binary
-        run: pyinstaller --onefile --name telegram-cli src/__main__.py
-
-      - name: Package as zip
-        run: |
-          cd dist
-          zip telegram-cli-macos.zip telegram-cli
+      - name: Build macOS binary
+        run: bash telegram/telegram-cli/tools/build_macos.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
