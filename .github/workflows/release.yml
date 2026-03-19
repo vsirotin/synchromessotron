@@ -118,8 +118,10 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            release-assets/telegram-cli.pyz
-            release-assets/telegram-cli.exe
-            release-assets/telegram-cli-macos.zip
-          generate_release_notes: true
+            files: |
+              release-assets/telegram-cli.pyz
+              release-assets/telegram-cli.exe
+              release-assets/telegram-cli-macos.zip
+            generate_release_notes: true
+            draft: true
+            prerelease: true
