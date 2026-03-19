@@ -17,12 +17,7 @@ import pytest
 import sys
 from pathlib import Path
 
-# Allow importing telegram-lib's src package directly.
-_lib_root = Path(__file__).resolve().parents[3] / "telegram-lib"
-if str(_lib_root) not in sys.path:
-    sys.path.insert(0, str(_lib_root))
-
-from src.models import ErrorCode
+from telegram_lib.models import ErrorCode
 
 
 def _mock_client():
@@ -37,7 +32,7 @@ class TestTimeout:
     @pytest.mark.asyncio
     async def test_ping_timeout_returns_network_error(self):
         """ping must report NETWORK_ERROR when the connection times out."""
-        from src.health import check_availability
+        from telegram_lib.health import check_availability
 
         client = _mock_client()
         client.get_me = AsyncMock(side_effect=asyncio.TimeoutError())
@@ -50,7 +45,7 @@ class TestTimeout:
     @pytest.mark.asyncio
     async def test_get_dialogs_timeout_returns_network_error(self):
         """get-dialogs must report an error when the connection times out."""
-        from src.dialogs import get_dialogs
+        from telegram_lib.dialogs import get_dialogs
 
         client = _mock_client()
 
@@ -68,7 +63,7 @@ class TestTimeout:
     @pytest.mark.asyncio
     async def test_read_messages_timeout(self):
         """backup (read_messages) must handle timeout gracefully."""
-        from src.messages import read_messages
+        from telegram_lib.messages import read_messages
 
         client = _mock_client()
         client.get_entity = AsyncMock(side_effect=asyncio.TimeoutError())
@@ -81,7 +76,7 @@ class TestTimeout:
     @pytest.mark.asyncio
     async def test_send_message_timeout(self):
         """send must handle timeout gracefully."""
-        from src.messages import send_message
+        from telegram_lib.messages import send_message
 
         client = _mock_client()
         client.get_entity = AsyncMock(side_effect=asyncio.TimeoutError())

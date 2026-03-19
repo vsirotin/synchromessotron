@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.models import ErrorCode
+from telegram_lib.models import ErrorCode
 
 
 def _mock_client():
@@ -22,7 +22,7 @@ class TestGetDialogs:
 
     @pytest.mark.asyncio
     async def test_get_dialogs_happy(self):
-        from src.dialogs import get_dialogs
+        from telegram_lib.dialogs import get_dialogs
 
         dialog = MagicMock()
         dialog.id = -100123
@@ -50,7 +50,7 @@ class TestGetDialogs:
 
     @pytest.mark.asyncio
     async def test_get_dialogs_no_conn(self):
-        from src.dialogs import get_dialogs
+        from telegram_lib.dialogs import get_dialogs
 
         client = _mock_client()
 
@@ -67,7 +67,7 @@ class TestGetDialogs:
 
     @pytest.mark.asyncio
     async def test_get_dialogs_timeout(self):
-        from src.dialogs import get_dialogs
+        from telegram_lib.dialogs import get_dialogs
 
         client = _mock_client()
 
@@ -86,7 +86,7 @@ class TestGetDialogs:
     async def test_get_dialogs_rate_limit(self):
         from telethon.errors import FloodWaitError
 
-        from src.dialogs import get_dialogs
+        from telegram_lib.dialogs import get_dialogs
 
         client = _mock_client()
 
@@ -106,7 +106,7 @@ class TestGetDialogs:
 
     @pytest.mark.asyncio
     async def test_get_dialogs_empty(self):
-        from src.dialogs import get_dialogs
+        from telegram_lib.dialogs import get_dialogs
 
         client = _mock_client()
 

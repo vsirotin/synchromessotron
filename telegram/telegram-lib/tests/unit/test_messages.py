@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.models import ErrorCode
+from telegram_lib.models import ErrorCode
 
 SINCE = datetime(2026, 3, 1, 12, 0, 0, tzinfo=UTC)
 MSG_TIME = datetime(2026, 3, 1, 12, 0, 1, tzinfo=UTC)
@@ -53,7 +53,7 @@ class TestReadMessages:
 
     @pytest.mark.asyncio
     async def test_read_messages_happy(self):
-        from src.messages import read_messages
+        from telegram_lib.messages import read_messages
 
         client = _mock_client()
         entity = _mock_entity()
@@ -69,7 +69,7 @@ class TestReadMessages:
 
     @pytest.mark.asyncio
     async def test_read_messages_incremntal(self):
-        from src.messages import read_messages
+        from telegram_lib.messages import read_messages
 
         old_msg = _make_tg_msg(date=SINCE)
         new_msg = _make_tg_msg(msg_id=2, text="New", date=MSG_TIME)
@@ -86,7 +86,7 @@ class TestReadMessages:
 
     @pytest.mark.asyncio
     async def test_read_messages_not_found(self):
-        from src.messages import read_messages
+        from telegram_lib.messages import read_messages
 
         client = _mock_client()
         client.get_entity = AsyncMock(side_effect=ValueError("not found"))
@@ -98,7 +98,7 @@ class TestReadMessages:
 
     @pytest.mark.asyncio
     async def test_read_messages_no_conn(self):
-        from src.messages import read_messages
+        from telegram_lib.messages import read_messages
 
         client = _mock_client()
         client.get_entity = AsyncMock(side_effect=ConnectionError("no network"))
@@ -110,7 +110,7 @@ class TestReadMessages:
 
     @pytest.mark.asyncio
     async def test_read_messages_timeout(self):
-        from src.messages import read_messages
+        from telegram_lib.messages import read_messages
 
         client = _mock_client()
         client.get_entity = AsyncMock(side_effect=TimeoutError("timed out"))
@@ -131,7 +131,7 @@ class TestSendMessage:
 
     @pytest.mark.asyncio
     async def test_send_message_happy(self):
-        from src.messages import send_message
+        from telegram_lib.messages import send_message
 
         client = _mock_client()
         entity = _mock_entity()
@@ -146,7 +146,7 @@ class TestSendMessage:
 
     @pytest.mark.asyncio
     async def test_send_message_not_found(self):
-        from src.messages import send_message
+        from telegram_lib.messages import send_message
 
         client = _mock_client()
         client.get_entity = AsyncMock(side_effect=ValueError("entity not found"))
@@ -158,7 +158,7 @@ class TestSendMessage:
 
     @pytest.mark.asyncio
     async def test_send_message_no_conn(self):
-        from src.messages import send_message
+        from telegram_lib.messages import send_message
 
         client = _mock_client()
         client.get_entity = AsyncMock(side_effect=ConnectionError("no network"))
@@ -172,7 +172,7 @@ class TestSendMessage:
     async def test_send_message_perm_deny(self):
         from telethon.errors import ChatWriteForbiddenError
 
-        from src.messages import send_message
+        from telegram_lib.messages import send_message
 
         client = _mock_client()
         entity = _mock_entity()
@@ -195,7 +195,7 @@ class TestEditMessage:
 
     @pytest.mark.asyncio
     async def test_edit_message_happy(self):
-        from src.messages import edit_message
+        from telegram_lib.messages import edit_message
 
         client = _mock_client()
         entity = _mock_entity()
@@ -210,7 +210,7 @@ class TestEditMessage:
 
     @pytest.mark.asyncio
     async def test_edit_message_not_found(self):
-        from src.messages import edit_message
+        from telegram_lib.messages import edit_message
 
         client = _mock_client()
         client.get_entity = AsyncMock(side_effect=ValueError("not found"))
@@ -224,7 +224,7 @@ class TestEditMessage:
     async def test_edit_message_no_change(self):
         from telethon.errors import MessageNotModifiedError
 
-        from src.messages import edit_message
+        from telegram_lib.messages import edit_message
 
         client = _mock_client()
         entity = _mock_entity()
@@ -238,7 +238,7 @@ class TestEditMessage:
 
     @pytest.mark.asyncio
     async def test_edit_message_no_conn(self):
-        from src.messages import edit_message
+        from telegram_lib.messages import edit_message
 
         client = _mock_client()
         client.get_entity = AsyncMock(side_effect=ConnectionError("no network"))
@@ -259,7 +259,7 @@ class TestDeleteMessage:
 
     @pytest.mark.asyncio
     async def test_delete_message_happy(self):
-        from src.messages import delete_message
+        from telegram_lib.messages import delete_message
 
         client = _mock_client()
         entity = _mock_entity()
@@ -274,7 +274,7 @@ class TestDeleteMessage:
 
     @pytest.mark.asyncio
     async def test_delete_message_not_found(self):
-        from src.messages import delete_message
+        from telegram_lib.messages import delete_message
 
         client = _mock_client()
         client.get_entity = AsyncMock(side_effect=ValueError("not found"))
@@ -286,7 +286,7 @@ class TestDeleteMessage:
 
     @pytest.mark.asyncio
     async def test_delete_message_no_conn(self):
-        from src.messages import delete_message
+        from telegram_lib.messages import delete_message
 
         client = _mock_client()
         client.get_entity = AsyncMock(side_effect=ConnectionError("no network"))
@@ -300,7 +300,7 @@ class TestDeleteMessage:
     async def test_delete_message_perm_deny(self):
         from telethon.errors import MessageDeleteForbiddenError
 
-        from src.messages import delete_message
+        from telegram_lib.messages import delete_message
 
         client = _mock_client()
         entity = _mock_entity()
@@ -323,7 +323,7 @@ class TestCountMessages:
 
     @pytest.mark.asyncio
     async def test_count_messages_happy(self):
-        from src.messages import count_messages
+        from telegram_lib.messages import count_messages
 
         client = _mock_client()
         entity = _mock_entity()
@@ -341,7 +341,7 @@ class TestCountMessages:
 
     @pytest.mark.asyncio
     async def test_count_messages_since(self):
-        from src.messages import count_messages
+        from telegram_lib.messages import count_messages
 
         client = _mock_client()
         entity = _mock_entity()
@@ -359,7 +359,7 @@ class TestCountMessages:
 
     @pytest.mark.asyncio
     async def test_count_messages_not_found(self):
-        from src.messages import count_messages
+        from telegram_lib.messages import count_messages
 
         client = _mock_client()
         client.get_entity = AsyncMock(side_effect=ValueError("not found"))
@@ -371,7 +371,7 @@ class TestCountMessages:
 
     @pytest.mark.asyncio
     async def test_count_messages_no_conn(self):
-        from src.messages import count_messages
+        from telegram_lib.messages import count_messages
 
         client = _mock_client()
         client.get_entity = AsyncMock(side_effect=ConnectionError("no network"))
@@ -383,7 +383,7 @@ class TestCountMessages:
 
     @pytest.mark.asyncio
     async def test_count_messages_timeout(self):
-        from src.messages import count_messages
+        from telegram_lib.messages import count_messages
 
         client = _mock_client()
         client.get_entity = AsyncMock(side_effect=TimeoutError("timed out"))
@@ -397,7 +397,7 @@ class TestCountMessages:
     async def test_count_messages_rate_limit(self):
         from telethon.errors import FloodWaitError
 
-        from src.messages import count_messages
+        from telegram_lib.messages import count_messages
 
         client = _mock_client()
         entity = _mock_entity()

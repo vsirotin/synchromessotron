@@ -4,7 +4,7 @@ Unit tests for src/client.py — create_client.
 
 from __future__ import annotations
 
-from src.client import create_client
+from telegram_lib.client import create_client
 
 
 class TestCreateClient:

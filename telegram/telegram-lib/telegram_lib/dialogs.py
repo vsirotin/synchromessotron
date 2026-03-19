@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from telethon import TelegramClient
 
-from src._logging import logged
-from src.models import DialogInfo, ErrorCode, TgError, TgResult
+from telegram_lib._logging import logged
+from telegram_lib.models import DialogInfo, ErrorCode, TgError, TgResult
 
 # ---------------------------------------------------------------------------
 # F5 — Retrieve dialogs

@@ -1,5 +1,8 @@
 # Project telegram/telegram-lib. Release notes 
 
+## Version: 1.2.3
+Renamed Python package from `src` to `telegram_lib` to eliminate namespace collision with telegram-cli when bundled together in a shiv `.pyz` archive. Updated all internal imports, test patch paths, and pyproject.toml package discovery. Added `package-data` config to include `version.yaml` in the built wheel. No public API changes.
+
 ## Version: 1.2.2
 Fixed 14 ruff lint errors and 6 black formatting issues. Changes: sorted imports (`__init__.py`, `version.py`, test files), removed unused imports (`patch` in test_client, `Path`/`PropertyMock` in test_media, `pytest` in test_version), wrapped long lines in `dialogs.py`, migrated `ErrorCode` from `(str, Enum)` to `StrEnum`. All 51 tests pass.
 

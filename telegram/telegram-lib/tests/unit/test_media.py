@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.models import ErrorCode
+from telegram_lib.models import ErrorCode
 
 MSG_TIME = datetime(2026, 3, 1, 12, 0, 1, tzinfo=UTC)
 
@@ -45,7 +45,7 @@ class TestDownloadMedia:
 
     @pytest.mark.asyncio
     async def test_download_media_happy(self, tmp_path):
-        from src.media import download_media
+        from telegram_lib.media import download_media
 
         # Create a fake downloaded file
         fake_file = tmp_path / "photo.jpg"
@@ -69,7 +69,7 @@ class TestDownloadMedia:
 
     @pytest.mark.asyncio
     async def test_download_media_no_media(self):
-        from src.media import download_media
+        from telegram_lib.media import download_media
 
         msg = _make_tg_msg(media=None)
         client = _mock_client()
@@ -84,7 +84,7 @@ class TestDownloadMedia:
 
     @pytest.mark.asyncio
     async def test_download_media_msg_miss(self):
-        from src.media import download_media
+        from telegram_lib.media import download_media
 
         client = _mock_client()
         client.get_entity = AsyncMock(return_value=_mock_entity())
@@ -97,7 +97,7 @@ class TestDownloadMedia:
 
     @pytest.mark.asyncio
     async def test_download_media_not_found(self):
-        from src.media import download_media
+        from telegram_lib.media import download_media
 
         client = _mock_client()
         client.get_entity = AsyncMock(side_effect=ValueError("entity not found"))
@@ -109,7 +109,7 @@ class TestDownloadMedia:
 
     @pytest.mark.asyncio
     async def test_download_media_no_conn(self):
-        from src.media import download_media
+        from telegram_lib.media import download_media
 
         client = _mock_client()
         client.get_entity = AsyncMock(side_effect=ConnectionError("no network"))
@@ -121,7 +121,7 @@ class TestDownloadMedia:
 
     @pytest.mark.asyncio
     async def test_download_media_null_path(self):
-        from src.media import download_media
+        from telegram_lib.media import download_media
 
         media_mock = MagicMock()
         msg = _make_tg_msg(media=media_mock)

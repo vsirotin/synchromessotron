@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build telegram-cli.pyz (cross-platform Python archive).
-# Requires: Python >= 3.11, pip, shiv, build.
+# Requires: Python >= 3.11.
 #
 # Usage (from telegram/telegram-cli):
 #   bash tools/build_pyz.sh
@@ -15,26 +15,28 @@ LIB_DIR="$(cd "$PROJECT_DIR/../telegram-lib" && pwd)"
 
 cd "$PROJECT_DIR"
 
-echo "==> Installing shiv and build..."
-pip install --quiet shiv build
+# Create an isolated build venv so we never touch the global Python.
+BUILD_VENV="$PROJECT_DIR/dist/.build-venv"
+if [[ ! -f "$BUILD_VENV/bin/python" ]]; then
+    echo "==> Creating build venv at dist/.build-venv ..."
+    python3 -m venv "$BUILD_VENV"
+fi
+PY="$BUILD_VENV/bin/python"
+PIP="$BUILD_VENV/bin/pip"
+SHIV="$BUILD_VENV/bin/shiv"
+
+echo "==> Installing shiv and build into build venv..."
+"$PIP" install --quiet shiv build
 
 echo "==> Building telegram-lib wheel..."
 mkdir -p dist/wheels
 cd "$LIB_DIR"
-python -m build --wheel --outdir "$PROJECT_DIR/dist/wheels" .
+"$PY" -m build --wheel --outdir "$PROJECT_DIR/dist/wheels" .
 cd "$PROJECT_DIR"
-
-echo "==> Creating console script wrapper..."
-cat > src/_pyz_entry.py << 'EOF'
-"""Wrapper to run telegram-cli from pyz."""
-from src.cli import main
-if __name__ == "__main__":
-    main()
-EOF
 
 echo "==> Building telegram-cli.pyz..."
 mkdir -p dist
-shiv -o dist/telegram-cli.pyz --find-links dist/wheels -e src._pyz_entry:main .
+"$SHIV" -o dist/telegram-cli.pyz --find-links dist/wheels -e src.cli:main .
 
 echo "==> Done: dist/telegram-cli.pyz"
 echo "    Smoke test:  python3 dist/telegram-cli.pyz version"

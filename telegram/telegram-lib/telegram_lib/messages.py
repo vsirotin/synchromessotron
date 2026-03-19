@@ -11,9 +11,9 @@ from datetime import datetime
 
 from telethon import TelegramClient
 
-from src._logging import logged
-from src.dialogs import _map_exception
-from src.models import ErrorCode, MessageInfo, TgError, TgResult
+from telegram_lib._logging import logged
+from telegram_lib.dialogs import _map_exception
+from telegram_lib.models import ErrorCode, MessageInfo, TgError, TgResult
 
 # ---------------------------------------------------------------------------
 # Helpers

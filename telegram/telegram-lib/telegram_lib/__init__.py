@@ -19,12 +19,12 @@ Models:
     VersionInfo
 """
 
-from src.client import create_client
-from src.dialogs import get_dialogs
-from src.health import check_availability, validate_session
-from src.media import download_media
-from src.messages import delete_message, edit_message, read_messages, send_message
-from src.models import (
+from telegram_lib.client import create_client
+from telegram_lib.dialogs import get_dialogs
+from telegram_lib.health import check_availability, validate_session
+from telegram_lib.media import download_media
+from telegram_lib.messages import delete_message, edit_message, read_messages, send_message
+from telegram_lib.models import (
     DialogInfo,
     ErrorCode,
     MediaResult,
@@ -35,7 +35,7 @@ from src.models import (
     TgResult,
     VersionInfo,
 )
-from src.version import get_version
+from telegram_lib.version import get_version
 
 __all__ = [
     # factory

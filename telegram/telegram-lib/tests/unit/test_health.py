@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.models import ErrorCode
+from telegram_lib.models import ErrorCode
 
 
 def _mock_client():
@@ -27,7 +27,7 @@ class TestCheckAvailability:
 
     @pytest.mark.asyncio
     async def test_check_avail_happy(self):
-        from src.health import check_availability
+        from telegram_lib.health import check_availability
 
         client = _mock_client()
         client.is_connected = MagicMock(return_value=True)
@@ -41,7 +41,7 @@ class TestCheckAvailability:
 
     @pytest.mark.asyncio
     async def test_check_avail_no_conn(self):
-        from src.health import check_availability
+        from telegram_lib.health import check_availability
 
         client = _mock_client()
         client.is_connected = MagicMock(return_value=True)
@@ -55,7 +55,7 @@ class TestCheckAvailability:
     @pytest.mark.asyncio
     async def test_check_avail_reconn(self):
         """Branch: client is not connected, so connect() is called first."""
-        from src.health import check_availability
+        from telegram_lib.health import check_availability
 
         client = _mock_client()
         client.is_connected = MagicMock(return_value=False)
@@ -70,7 +70,7 @@ class TestCheckAvailability:
 
     @pytest.mark.asyncio
     async def test_check_avail_timeout(self):
-        from src.health import check_availability
+        from telegram_lib.health import check_availability
 
         client = _mock_client()
         client.is_connected = MagicMock(return_value=True)
@@ -92,7 +92,7 @@ class TestValidateSession:
 
     @pytest.mark.asyncio
     async def test_validate_sess_happy(self):
-        from src.health import validate_session
+        from telegram_lib.health import validate_session
 
         me = MagicMock()
         me.id = 12345
@@ -114,7 +114,7 @@ class TestValidateSession:
     @pytest.mark.asyncio
     async def test_validate_sess_invalid(self):
         """get_me returns None when the session is not authenticated."""
-        from src.health import validate_session
+        from telegram_lib.health import validate_session
 
         client = _mock_client()
         client.get_me = AsyncMock(return_value=None)
@@ -126,7 +126,7 @@ class TestValidateSession:
 
     @pytest.mark.asyncio
     async def test_validate_sess_no_conn(self):
-        from src.health import validate_session
+        from telegram_lib.health import validate_session
 
         client = _mock_client()
         client.get_me = AsyncMock(side_effect=ConnectionError("no network"))
@@ -138,7 +138,7 @@ class TestValidateSession:
 
     @pytest.mark.asyncio
     async def test_validate_sess_timeout(self):
-        from src.health import validate_session
+        from telegram_lib.health import validate_session
 
         client = _mock_client()
         client.get_me = AsyncMock(side_effect=TimeoutError("timed out"))
