@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.5
+Fixed fragile `test_get_cli_version_happy` test that hardcoded the version string `"1.0.3"` — broke on every version bump. Replaced with `re.match(r"^\d+\.\d+\.\d+$", ...)` regex check.
+
 ## Version: 1.0.4
 Fixed `telegram-cli.pyz` crashes: (1) resolved `src` namespace collision — telegram-lib package renamed from `src` to `telegram_lib`, `_lib.py` rewritten to use direct imports; (2) added `[tool.setuptools.packages.find]` and `package-data` to pyproject.toml so the `src` package and `version.yaml` are correctly included in the wheel; (3) removed obsolete `_ensure_lib_path()` from `errors.py`. Updated `test_timeout.py` to import from `telegram_lib`. All 95 tests pass.
 

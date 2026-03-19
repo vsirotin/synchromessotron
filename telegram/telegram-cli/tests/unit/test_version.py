@@ -4,6 +4,7 @@ Unit tests for src/version.py — CLI version reader.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from unittest.mock import patch
 
@@ -24,7 +25,7 @@ class TestGetCliVersion:
     def test_get_cli_version_happy(self):
         """Happy path: version.yaml is readable and well-formed."""
         result = get_cli_version()
-        assert result["version"] == "1.0.3"
+        assert re.match(r"^\d+\.\d+\.\d+$", result["version"])
         assert result["build"] == 1
         assert "datetime" in result
 
