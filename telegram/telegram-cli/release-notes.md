@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.2
+Updated telegram-lib dependency to version 1.2.2. Fixed 14 ruff lint errors and 6 black formatting issues in telegram-lib (import sorting, unused imports, line length, StrEnum).
+
 ## Version: 1.0.1
 Added build scripts `tools/build_pyz.sh`, `tools/build_windows.sh`, `tools/build_macos.sh` for local builds. Refactored `release.yml` to call the same scripts. Expanded DEVELOPMENT.md §1 with step-by-step build explanations, CI monitoring instructions, artifact download guide, and release deletion procedure. Updated project structure tree and §5 (quality-gate now active for telegram-cli).
 

@@ -22,7 +22,17 @@ Update the file `<project-root>/src/version.yaml` (if it exists). Use semantic v
 
 Insert the new version entry **at the beginning** (after the header, at line 3) in `<project-root>/release-notes.md` (if it exists). Include the remembered version number and a short explanation of the version update. Latest release appears first, oldest releases appear last. Do not reorder or overwrite previous entries.
 
-### 3. Write commit text proposal
+### 3. Update dependent project versions
+
+When a library changes, discover dependent projects by scanning `pyproject.toml` files in the workspace for the library name in their `dependencies` list. For each dependent project found:
+
+1. **Run tests** to ensure compatibility (as per common-development rule #12).
+2. **Update version** in the dependent project's `src/version.yaml` and `pyproject.toml` using semantic versioning (typically a patch bump, e.g., 1.0.1 → 1.0.2).
+3. **Update release notes** with an entry describing the dependency update.
+
+This ensures that dependent projects stay synchronized with their updated dependencies.
+
+### 4. Write commit text proposal
 
 Rewrite the content of `<project-root>/commit-text-proposal.txt` with the following format:
 
@@ -34,17 +44,17 @@ Rewrite the content of `<project-root>/commit-text-proposal.txt` with the follow
 
 Prefixes:
 
-| Prefix       | Meaning                                                        |
-|--------------|----------------------------------------------------------------|
-| `[test]`     | Update `test/*` files                                          |
-| `[dist]`     | Changes to submodules, version bumps, updates to `package.json`|
-| `[minor]`    | Small changes                                                  |
-| `[doc]`      | Updates to documentation                                       |
-| `[fix]`      | Bug fixes                                                      |
-| `[bin]`      | Update binary scripts associated with the project              |
-| `[refactor]` | Refactor of existing code                                      |
-| `[nit]`      | Small code review changes mainly around style or syntax        |
-| `[feat]`     | New features                                                   |
+| Prefix      | Meaning                                                        |
+|-------------|----------------------------------------------------------------|
+| `test`      | Update `test/*` files                                          |
+| `dist`      | Changes to submodules, version bumps, updates to `package.json`|
+| `minor`     | Small changes                                                  |
+| `doc`       | Updates to documentation                                       |
+| `fix`       | Bug fixes                                                      |
+| `bin`       | Update binary scripts associated with the project              |
+| `refactor`  | Refactor of existing code                                      |
+| `nit`       | Small code review changes mainly around style or syntax        |
+| `feat`      | New features                                                   |
 
 **Examples:**
 
