@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build telegram-cli.exe (Windows, PyInstaller).
 # Run on a Windows machine via Git Bash, WSL, or the GitHub Actions runner.
-# Requires: Python >= 3.11, pip, PyInstaller.
+# Requires: Python >= 3.11, pip, PyInstaller, build.
 #
 # Usage (from telegram/telegram-cli):
 #   bash tools/build_windows.sh
@@ -16,11 +16,17 @@ LIB_DIR="$(cd "$PROJECT_DIR/../telegram-lib" && pwd)"
 
 cd "$PROJECT_DIR"
 
-echo "==> Installing PyInstaller..."
-pip install --quiet pyinstaller
+echo "==> Installing PyInstaller, build, and wheel..."
+pip install --quiet pyinstaller build wheel
 
-echo "==> Installing telegram-lib from $LIB_DIR..."
-pip install --quiet "$LIB_DIR"
+echo "==> Building telegram-lib wheel..."
+mkdir -p dist/wheels
+cd "$LIB_DIR"
+python -m build --wheel --outdir "$PROJECT_DIR/dist/wheels" .
+cd "$PROJECT_DIR"
+
+echo "==> Installing telegram-lib from wheel..."
+pip install --quiet --no-index --find-links dist/wheels telegram-lib
 
 echo "==> Installing telegram-cli..."
 pip install --quiet .

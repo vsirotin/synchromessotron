@@ -37,6 +37,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install dependencies
+        run: pip install ./telegram/telegram-lib
+
       - name: Build .pyz
         run: bash telegram/telegram-cli/tools/build_pyz.sh
 
@@ -58,6 +61,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install ./telegram/telegram-lib
 
       - name: Build .exe
         shell: bash
@@ -81,6 +87,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install ./telegram/telegram-lib
 
       - name: Build macOS binary
         run: bash telegram/telegram-cli/tools/build_macos.sh

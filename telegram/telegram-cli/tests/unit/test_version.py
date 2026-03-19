@@ -24,7 +24,7 @@ class TestGetCliVersion:
     def test_get_cli_version_happy(self):
         """Happy path: version.yaml is readable and well-formed."""
         result = get_cli_version()
-        assert result["version"] == "1.0.2"
+        assert result["version"] == "1.0.3"
         assert result["build"] == 1
         assert "datetime" in result
 
