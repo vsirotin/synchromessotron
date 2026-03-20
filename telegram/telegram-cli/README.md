@@ -41,7 +41,7 @@ You do not need to be a programmer to use this tool. Just follow the steps below
 
 ### Step 1 — Choose your variant and download
 
-Go to the [latest release](https://github.com/vsirotin/synchromessotron/releases/tag/v1.0.0.3) page and download the variant for your platform:
+Go to the [Release](https://github.com/vsirotin/synchromessotron/releases/) page, find last stable version, open "Assets" and download the variant for your platform:
 
 | Platform | File | Python needed? |
 |----------|------|----------------|
