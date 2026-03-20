@@ -1,5 +1,8 @@
 # Project telegram/telegram-lib. Release notes 
 
+## Version: 1.2.4
+Updated workspace pyproject.toml configuration: added `[tool.workspace.projects]` section to track sub-project dependencies (telegram-lib, telegram-cli), cleaned up outdated root-level dependencies (firebase-admin, pydantic, Telethon, vk_api), and updated ruff configuration. Enhanced post-task skill to use workspace configuration for dependency discovery. All 51 tests pass.
+
 ## Version: 1.2.3
 Renamed Python package from `src` to `telegram_lib` to eliminate namespace collision with telegram-cli when bundled together in a shiv `.pyz` archive. Updated all internal imports, test patch paths, and pyproject.toml package discovery. Added `package-data` config to include `version.yaml` in the built wheel. No public API changes.
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "telegram-lib"
-version = "0.1.1"
+version = "1.2.4"
 description = "Stateless Python wrapper functions for the Telegram user-account API."
 readme = "README.md"
 license = { text = "MIT" }

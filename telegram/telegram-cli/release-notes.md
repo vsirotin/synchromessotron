@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.6
+Updated workspace pyproject.toml configuration: added `[tool.workspace.projects]` section to track sub-project dependencies, cleaned up outdated root-level dependencies, and updated ruff configuration. Enhanced post-task skill to use workspace configuration for dependency discovery. Restored telegram-cli.exe to release workflow assets. All 95 tests pass.
+
 ## Version: 1.0.5
 Fixed fragile `test_get_cli_version_happy` test that hardcoded the version string `"1.0.3"` — broke on every version bump. Replaced with `re.match(r"^\d+\.\d+\.\d+$", ...)` regex check.
 

@@ -5,18 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "synchromessotron"
 version = "0.1.0"
-description = "Firebase-hosted cron service that synchronizes messages between messenger accounts."
+description = "Workspace for telegram-lib and telegram-cli projects."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
-dependencies = [
-    "firebase-admin>=6.5",
-    "pydantic>=2.6",
-    "PyYAML>=6.0",
-    # Messenger libraries — confirmed at Checkpoint 1
-    "Telethon>=1.36",
-    "vk_api>=11.9",
-]
+dependencies = []
 
 [project.optional-dependencies]
 dev = [
@@ -27,9 +20,13 @@ dev = [
     "black>=24.3",
 ]
 
+[tool.workspace.projects]
+telegram-lib = { path = "telegram/telegram-lib/telegram_lib" }
+telegram-cli = { path = "telegram/telegram-cli/src", depends-on = ["telegram-lib"] }
+
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["telegram*", "vkontakte*", "functions*"]
+include = ["telegram"]
 
 [tool.ruff]
 line-length = 100
@@ -40,7 +37,7 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 ignore = []
 
 [tool.ruff.lint.isort]
-known-first-party = ["telegram", "vkontakte", "functions"]
+known-first-party = ["telegram_lib", "telegram_cli"]
 
 [tool.black]
 line-length = 100
