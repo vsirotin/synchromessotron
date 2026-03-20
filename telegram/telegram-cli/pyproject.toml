@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "telegram-cli"
-version = "1.0.6"
+version = "1.0.8"
 description = "Command-line interface for Telegram."
 readme = "README.md"
 license = { text = "MIT" }

@@ -4,9 +4,19 @@ Init command (F10) — interactive session setup.
 Creates or updates config.yaml by generating a Telegram session string
 through an interactive login flow.
 
+Decision tree:
+1. Show interruption guidance
+2. Search for config in default position
+3. If found → inform and quit
+4. If not found → ask user:
+   a. Do you have it elsewhere? → recommend copy and quit
+   b. Do you have credentials noted? → offer example file creation
+   c. Otherwise → continue to credential prompts
+5. Authenticate with Telegram
+
 Requirements:
-- F10-a: Detect existing config and offer choices (exit or create example)
-- F10-b: Show user guidance about Ctrl+C before credentials
+- F10-a: Detect existing config with informed guidance
+- F10-b: Show user guidance about Ctrl+C
 - F10-c: Handle login code with graceful Ctrl+C support
 - F10-d: Graceful error handling — no tracebacks
 """
@@ -25,59 +35,124 @@ logger = logging.getLogger("telegram_cli")
 
 
 def run_init() -> None:
-    """Run the interactive init flow."""
+    """Run the interactive init flow with decision tree."""
     config_path = _find_config_file()
 
-    # F10-a: Detect existing config and offer choices
-    if config_path.exists():
-        _handle_existing_config(config_path)
-        return  # Exit after user's choice
-
-    # F10-b: Show interruption guidance before starting credential input
+    # Step 1: Show interruption guidance
     print("ℹ  To interrupt at any time, press Ctrl+C\n")
 
-    # Prompt for new credentials
-    config = _prompt_credentials()
+    # Step 2: Search for config in default position
+    if config_path.exists():
+        _inform_config_found(config_path)
+        return
 
+    # Step 3: Config not found — ask if user has it elsewhere
+    if _ask_has_config_elsewhere():
+        return
+
+    # Step 4: Ask if user has credentials noted
+    if _ask_has_credentials_noted():
+        # User said yes — offer example file creation
+        if _ask_create_example_file():
+            _create_example_config(config_path)
+            return
+        # User said no — continue to credential prompts
+    # else: User said no — continue to credential prompts
+
+    # Step 5: Prompt for credentials and authenticate
+    config = _prompt_credentials()
     asyncio.run(_do_auth(config, config_path))
 
 
-def _handle_existing_config(config_path: Path) -> None:
+def _inform_config_found(config_path: Path) -> None:
     """
-    F10-a: Handle existing config.yaml.
-    
-    Offer user two options:
-    [A] Exit and let user copy existing config elsewhere
-    [B] Create example config.yaml.example for reference
+    Config found in default position.
+    Inform user and exit gracefully.
     """
-    print("ℹ  Found existing config.yaml. Either:")
-    print("  - Copy it to this directory and run 'telegram-cli init' again, or")
-    print("  - Choose option [B] below.")
+    print(f"ℹ  Found config.yaml at: {config_path}")
+    print("  No need to set up again. Run 'telegram-cli whoami' to verify your session.")
+    sys.exit(0)
+
+
+def _ask_has_config_elsewhere() -> bool:
+    """
+    Ask user if they have config.yaml in another location.
     
+    Returns:
+        True if user answered yes (and we should exit after recommending copy)
+        False if user answered no (continue to next decision)
+    """
     try:
-        user_choice = input("  [A] Exit now  [B] Create example config.yaml here  [Enter for A]: ").strip().upper()
-    except KeyboardInterrupt:
-        # F10-d: Graceful Ctrl+C handling
+        response = input(
+            "Do you have config.yaml in another location? [y/N]: "
+        ).strip().lower()
+    except (KeyboardInterrupt, EOFError):
         print("\n✗ Setup cancelled by user. Run 'telegram-cli init' again when ready.")
         sys.exit(1)
 
-    if user_choice == "B":
-        _create_example_config(config_path)
-    else:
-        # Default to [A] if empty or invalid input
-        # Just exit gracefully
+    if response in ("y", "yes"):
+        print("\n➜ Please copy config.yaml to the current directory:")
+        print(f"  cp /path/to/config.yaml ./config.yaml")
+        print("  Then run 'telegram-cli init' again.\n")
         sys.exit(0)
+
+    return False
+
+
+def _ask_has_credentials_noted() -> bool:
+    """
+    Ask user if they have api_id, api_hash, and session noted somewhere.
+    
+    Returns:
+        True if user answered yes
+        False if user answered no
+    """
+    try:
+        response = input(
+            "Do you have api_id, api_hash, and session noted somewhere? [y/N]: "
+        ).strip().lower()
+    except (KeyboardInterrupt, EOFError):
+        print("\n✗ Setup cancelled by user. Run 'telegram-cli init' again when ready.")
+        sys.exit(1)
+
+    return response in ("y", "yes")
+
+
+def _ask_create_example_file() -> bool:
+    """
+    Ask user if they want us to create an example config file.
+    
+    Returns:
+        True if user answered yes
+        False if user answered no (continue to credential prompts)
+    """
+    try:
+        response = input(
+            "Should I create an example config.yaml.example for you to fill in? [y/N]: "
+        ).strip().lower()
+    except (KeyboardInterrupt, EOFError):
+        print("\n✗ Setup cancelled by user. Run 'telegram-cli init' again when ready.")
+        sys.exit(1)
+
+    return response in ("y", "yes")
 
 
 def _create_example_config(config_path: Path) -> None:
     """
-    F10-a (option B): Create a template config.yaml.example.
+    Create a template config.yaml.example.
+    
+    Exit codes:
+    - 0: Success
+    - 1: User cancelled
+    - 2: File creation error
     """
     example_path = config_path.parent / "config.yaml.example"
-    
+
     example_content = """\
 # telegram-cli configuration template
-# Rename this to config.yaml and fill in your credentials
+# 1. Rename this file to config.yaml
+# 2. Fill in your Telegram credentials
+# 3. Run 'telegram-cli init' to complete setup
 
 telegram:
   api_id: YOUR_API_ID_HERE
@@ -85,57 +160,48 @@ telegram:
   phone: YOUR_PHONE_NUMBER_HERE
   session: null  # Generated automatically by 'telegram-cli init'
 """
-    
+
     try:
         example_path.write_text(example_content, encoding="utf-8")
-        print("✓ Example config created as config.yaml.example")
-        print("  Edit it with your credentials and rename to config.yaml, then re-run 'telegram-cli init'.")
+        print(f"\n✓ Example config created: {example_path}")
+        print("  Steps:")
+        print(f"    1. Edit config.yaml.example (fill in YOUR_API_ID_HERE, etc.)")
+        print(f"    2. Rename to config.yaml")
+        print(f"    3. Run 'telegram-cli init' again\n")
         sys.exit(0)
     except OSError as exc:
-        print(f"Error [INTERNAL_ERROR]: Cannot create example config: {exc}", file=sys.stderr)
-        sys.exit(1)
-
-
-def _load_existing_config(config_path: Path) -> dict:
-    """Load existing config, reusing api_id, api_hash, phone."""
-    import yaml
-    try:
-        text = config_path.read_text(encoding="utf-8")
-        data = yaml.safe_load(text)
-        tg = data.get("telegram", {})
-        for key in ("api_id", "api_hash", "phone"):
-            if key not in tg:
-                print(f"Error: Missing '{key}' in existing config.yaml.", file=sys.stderr)
-                sys.exit(1)
-        tg["api_id"] = int(tg["api_id"])
-        return tg
-    except (yaml.YAMLError, OSError) as exc:
-        print(f"Error: Cannot read config.yaml: {exc}", file=sys.stderr)
-        sys.exit(1)
+        print(f"✗ Error: Cannot create example config: {exc}", file=sys.stderr)
+        sys.exit(2)
 
 
 def _prompt_credentials() -> dict:
     """
     F10-b, F10-d: Prompt user for api_id, api_hash, and phone.
+    
     Gracefully handle Ctrl+C with user-friendly message (no tracebacks).
+    
+    Exit codes:
+    - Returns dict on success
+    - 1 on KeyboardInterrupt/EOFError
+    - 1 on validation error
     """
-    print("Setting up telegram-cli credentials.\n")
+    print("Setting up Telegram credentials.\n")
     try:
         api_id_str = input("Enter your api_id: ").strip()
         try:
             api_id = int(api_id_str)
         except ValueError:
-            print("Error: api_id must be a number.", file=sys.stderr)
+            print("✗ Error: api_id must be a number.", file=sys.stderr)
             sys.exit(1)
 
         api_hash = input("Enter your api_hash: ").strip()
         if not api_hash:
-            print("Error: api_hash cannot be empty.", file=sys.stderr)
+            print("✗ Error: api_hash cannot be empty.", file=sys.stderr)
             sys.exit(1)
 
         phone = input("Enter your phone number (e.g. +1234567890): ").strip()
         if not phone:
-            print("Error: phone cannot be empty.", file=sys.stderr)
+            print("✗ Error: phone cannot be empty.", file=sys.stderr)
             sys.exit(1)
 
     except KeyboardInterrupt:

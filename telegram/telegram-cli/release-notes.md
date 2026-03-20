@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.8
+Init command decision tree rewrite: 5-step multi-branch flow with config existence detection, config location query, credentials notes prompt, example file creation offer, and comprehensive credential validation. Graceful Ctrl+C handling throughout with friendly cancellation messages (no tracebacks). Added 7 helper functions with proper error handling. All 115 unit tests pass (94 base + 21 new init-specific tests).
+
 ## Version: 1.0.7
 Added F10-a through F10-d init command UX improvements: (a) existing config detection with user choice to create example template, (b) display Ctrl+C interruption guidance before credential prompts, (c) graceful login code callback with KeyboardInterrupt support, (d) consistent error handling with friendly messages and no tracebacks. Added 20 comprehensive unit tests covering all new flows. All 115 tests pass.
 

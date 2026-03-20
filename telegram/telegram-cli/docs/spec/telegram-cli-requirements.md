@@ -455,57 +455,153 @@ telegram-cli init
 
 **Arguments:** None.
 
-**Behaviour:**
+**Decision Tree Flow:**
 
-1. **F10-a (Existing config detection):** Before starting the interactive flow, check if `config.yaml` already exists in the current directory.
-   - If it exists, offer the user two options:
-     - **[A]** Exit the command and let the user manually copy the existing `config.yaml` to this directory. Display: `"ℹ  Found existing config.yaml. Either:\n  - Copy it to this directory and run 'telegram-cli init' again, or\n  - Choose option [B] below.\n  [A] Exit now  [B] Create example config.yaml here  [Enter for A]: "`
-     - **[B]** Create a template `config.yaml.example` in the current directory (non-interactive) so the user can see the expected format. Display: `"✓ Example config created as config.yaml.example\n  Edit it with your credentials and rename to config.yaml, then re-run 'telegram-cli init'."`
-   - If it does not exist, proceed to F10-b.
+The initialization process follows a 5-step decision tree optimized to minimize user input and provide graceful recovery options. The flow diagram below illustrates all decision points and paths:
 
-2. **F10-b (User interruption guidance):** Before asking for credentials, display: `"ℹ  To interrupt at any time, press Ctrl+C"`, then continue.
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: Display Interruption Notice                                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ "ℹ  To interrupt at any time, press Ctrl+C"                                │
+└──────────────────────────┬──────────────────────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────────────────────┐
+│ STEP 2: Check for Existing config.yaml                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Does config.yaml exist in the current directory?                            │
+└──────────────────────┬───────────────────────────┬──────────────────────────┘
+                       │ YES                       │ NO
+                       │                           │
+          ┌────────────▼──────────────┐   ┌───────▼──────────────────┐
+          │ INFORM: Config found      │   │ Continue (go to STEP 4a) │
+          │ Exit(0) gracefully        │   │                          │
+          │ Return session immediately│   └───────┬──────────────────┘
+          └──────────────────────────┘           │
+                                                  │
+                ┌─────────────────────────────────▼────────────────────────┐
+                │ STEP 4a: Ask Config Location                             │
+                ├──────────────────────────────────────────────────────────┤
+                │ "Do you have config.yaml in another location? [y/N]: "  │
+                └──┬──────────────────────────────────────────┬────────────┘
+         YES    │                                             │    NO / Ctrl+C
+       ┌────────▼──────────┐                        ┌────────▼──────────┐
+       │ GUIDE TO COPY      │                        │ Continue (STEP 4b)│
+       │ Show copy cmd      │                        │                   │
+       │ Exit(0) on success │                        └────────┬──────────┘
+       └───────────────────┘                                  │
+                                                               │
+                ┌──────────────────────────────────────────────▼────────────┐
+                │ STEP 4b: Ask About Credentials                            │
+                ├───────────────────────────────────────────────────────────┤
+                │ "Do you have api_id, api_hash, phone noted? [y/N]: "    │
+                └──┬────────────────────────────────────────┬──────────────┘
+         YES    │                                           │    NO / Ctrl+C
+       ┌────────▼──────────────────┐          ┌────────────▼──────────┐
+       │ STEP 4c: Offer Example     │          │ STEP 5: Prompt All    │
+       │ "Create example config? [y/N]: "     │ Credentials           │
+       └──┬───────────────────────┬───┘       │ api_id, api_hash,     │
+  YES  │               │ NO / Ctrl+C   │     │ phone (with validation)
+  ┌────▼──────┐   ┌────▼────────┐    │      │                        │
+  │ CREATE     │   │ CONTINUE    │    │      │ (Falls through to STEP 6)
+  │ EXAMPLE    │   │ TO STEP 5   │    │      └────────┬──────────────┘
+  │ Exit(0)    │   └────┬────────┘    │               │
+  └───────────┘        │              │               │
+                        │              │               │
+              ┌─────────▴──────────────┴───────────────▴───────────────┐
+              │ STEP 6: Telegram Authentication                        │
+              ├────────────────────────────────────────────────────────┤
+              │ - Connect to Telegram                                  │
+              │ - If login code needed: Prompt for code (Ctrl+C safe) │
+              │ - If 2FA enabled: Prompt for password (Ctrl+C safe)   │
+              │ - Save session string to config.yaml                  │
+              │ - Exit(0) on success                                  │
+              └────────────────────────────────────────────────────────┘
+```
 
-3. If `config.yaml` does not exist (or user chose [B]), the command asks the user for `api_id`, `api_hash`, and `phone`, then prepares to write a new `config.yaml`.
+**Detailed Behavior:**
 
-4. If `config.yaml` already existed and was loaded (user did not choose [B]), the command reads `api_id`, `api_hash`, and `phone` from it.
+1. **STEP 1 — Interruption Guidance:** Display `"ℹ  To interrupt at any time, press Ctrl+C"` to inform users they can cancel safely at any point.
 
-5. Connects to Telegram and initiates authentication.
+2. **STEP 2 — Existing Config Detection:** Check if `config.yaml` exists in the current directory.
+   - **If found:** Display informational message and exit with code 0 (session already initialized; no action needed).
+   - **If not found:** Proceed to STEP 4a.
 
-6. **F10-c (Login code handling):** If Telegram sends a login code (determined by Telethon's internal logic), prompt the user: `"Enter the login code sent to your Telegram app (or press Ctrl+C to cancel): "`. If the user interrupts with Ctrl+C, display: `"✗ Setup cancelled by user. Run 'telegram-cli init' again when ready."` and exit gracefully with exit code 1.
+3. **STEP 4a — Config Location Query:** Ask: `"Do you have config.yaml in another location? [y/N]: "`
+   - **If Yes:** Guide the user to copy the existing config, display the command, and exit with code 0.
+   - **If No or Ctrl+C:** Proceed to STEP 4b.
 
-7. If Two-Step Verification (2FA) is enabled, prompt: `"Enter your 2FA password (or press Ctrl+C to cancel): "`. If the user interrupts, show the same cancellation message and exit with code 1.
+4. **STEP 4b — Credentials Notes Query:** Ask: `"Do you have api_id, api_hash, and phone noted somewhere? [y/N]: "`
+   - **If Yes:** Offer to create an example file (proceed to STEP 4c).
+   - **If No or Ctrl+C:** Skip to STEP 5 (direct credential prompt).
 
-8. Writes the generated session string into `config.yaml` (field `session` under the `telegram` section).
+5. **STEP 4c — Example File Offer:** Ask: `"Should I create an example config.yaml.example for you? [y/N]: "`
+   - **If Yes:** Create a template file with placeholders and exit with code 0 (user will fill it manually later).
+   - **If No or Ctrl+C:** Proceed to STEP 5.
 
-9. **F10-d (Graceful error handling):** If any Ctrl+C (KeyboardInterrupt) is pressed during credential input (api_id, api_hash, phone, code, 2FA), display: `"✗ Setup cancelled by user. Run 'telegram-cli init' again when ready."` and exit with code 1. Never display Python stack traces or tracebacks.
+6. **STEP 5 — Prompt for Credentials:** Ask for `api_id`, `api_hash`, and `phone` with:
+   - Input validation (e.g. `api_id` must be numeric).
+   - Graceful Ctrl+C handling (show cancellation message, exit with code 1).
+   - Helpful error messages for invalid input.
+
+7. **STEP 6 — Telegram Authentication:** 
+   - Connect to Telegram and initiate authentication.
+   - If a login code is sent: Prompt: `"Enter the login code sent to your Telegram app: "` (Ctrl+C safe).
+   - If Two-Step Verification (2FA) is enabled: Prompt: `"Enter your 2FA password: "` (Ctrl+C safe).
+   - Save the generated session string to `config.yaml` (field `session` under the `telegram` section).
+   - Exit with code 0 on success.
+
+**Graceful Error Handling:**
+
+- **Ctrl+C (KeyboardInterrupt) at any prompt:** Display `"✗ Setup cancelled by user. Run 'telegram-cli init' again when ready."` and exit with code 1. No Python tracebacks.
+- **Invalid input (validation failure):** Display a friendly message explaining the error and re-prompt the user.
+- **File write failure:** Display `"✗ Cannot write config.yaml: [reason]"` and exit with code 1.
+- **Telegram API error:** Display error details with code 2.
 
 **Examples:**
 
 ```bash
-python3 telegram-cli.pyz init
-```
-
-**Output (success):**
-
-```
+# Typical flow for new user (no config)
+telegram-cli init
+ℹ  To interrupt at any time, press Ctrl+C
+Do you have config.yaml in another location? [y/N]: n
+Do you have api_id, api_hash, and phone noted somewhere? [y/N]: n
+Enter api_id: 1234567
+Enter api_hash: abc123def456...
+Enter phone (with country code, e.g. +1234567890): +1234567890
+[Telegram sends code]
+Enter the login code sent to your Telegram app: 12345
 ✓ Session created and saved to config.yaml
-  Run 'python3 telegram-cli.pyz whoami' to verify.
+  Run 'telegram-cli whoami' to verify.
 ```
 
-**Output (user chose [B] - example config):**
-
+```bash
+# User has config elsewhere
+telegram-cli init
+ℹ  To interrupt at any time, press Ctrl+C
+Do you have config.yaml in another location? [y/N]: y
+ℹ  To use your existing config here, run:
+  cp /path/to/existing/config.yaml ./config.yaml
+Then run 'telegram-cli init' again to validate the session.
 ```
-ℹ  Found existing config.yaml. Either:
-  - Copy it to this directory and run 'telegram-cli init' again, or
-  - Choose option [B] below.
-  [A] Exit now  [B] Create example config.yaml here  [Enter for A]: B
+
+```bash
+# User has credentials noted, wants example file
+telegram-cli init
+ℹ  To interrupt at any time, press Ctrl+C
+Do you have config.yaml in another location? [y/N]: n
+Do you have api_id, api_hash, and phone noted somewhere? [y/N]: y
+Should I create an example config.yaml.example for you? [y/N]: y
 ✓ Example config created as config.yaml.example
-  Edit it with your credentials and rename to config.yaml, then re-run 'telegram-cli init'.
+  Edit it with your credentials (api_id, api_hash, phone) and rename to config.yaml.
+Then run 'telegram-cli init' again.
 ```
 
-**Output (user pressed Ctrl+C):**
-
-```
+```bash
+# User interrupts with Ctrl+C
+telegram-cli init
+ℹ  To interrupt at any time, press Ctrl+C
+Do you have config.yaml in another location? [y/N]: ^C
 ✗ Setup cancelled by user. Run 'telegram-cli init' again when ready.
 ```
 
@@ -513,17 +609,19 @@ python3 telegram-cli.pyz init
 
 | Code | Meaning |
 |------|---------|
-| 0 | Session created and saved successfully. |
-| 1 | User cancelled with Ctrl+C, or invalid input, or config operations failed. |
-| 2 | Telegram API error (authentication failed, network error, etc.). |
+| 0 | Session created and saved successfully, or informational exit (config found, user guided elsewhere). |
+| 1 | User cancelled with Ctrl+C, invalid input, file write failure, or other local error. |
+| 2 | Telegram API error (authentication failed, network error, account banned). |
 
 **Possible errors:**
 
-| Error code | When it happens |
-|------------|-----------------|
-| `AUTH_FAILED` | Account is deactivated or banned. |
-| `NETWORK_ERROR` | Cannot connect to Telegram. |
-| `INTERNAL_ERROR` | Cannot write config.yaml (permissions, disk full, etc.). |
+| Error code | When it happens | User-Facing Message |
+|------------|-----------------|-----|
+| `RATE_LIMITED` | Too many auth attempts. | "Too many login attempts — wait a moment and try again." |
+| `AUTH_FAILED` | Account is deactivated or banned. | "Account deactivated or banned. Contact Telegram support." |
+| `SESSION_INVALID` | Session generation failed. | "Session generation failed. Try again or contact support." |
+| `NETWORK_ERROR` | Cannot connect to Telegram. | "Cannot connect to Telegram. Check your internet and try again." |
+| `INTERNAL_ERROR` | Cannot write config.yaml (permissions, disk full, etc.). | "Cannot write config.yaml: [specific reason]." |
 
 ---
 

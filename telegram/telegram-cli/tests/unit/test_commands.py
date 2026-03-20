@@ -367,21 +367,6 @@ class TestInit:
             _prompt_credentials()
         assert exc_info.value.code == 1
 
-    def test_init_load_existing(self, tmp_path):
-        """Existing config.yaml is loaded and reused."""
-        cfg = tmp_path / "config.yaml"
-        cfg.write_text(
-            "telegram:\n"
-            "  api_id: 99\n"
-            "  api_hash: hash99\n"
-            "  phone: '+491'\n"
-            "  session: old\n"
-        )
-        from src.commands.init_cmd import _load_existing_config
-        result = _load_existing_config(cfg)
-        assert result["api_id"] == 99
-        assert result["api_hash"] == "hash99"
-
 
 # ---------------------------------------------------------------------------
 # Send tests
