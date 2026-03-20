@@ -687,12 +687,6 @@ No parameters.
 
 ---
 
-## For Developers
-
-If you are a developer contributing to telegram-cli — building executables, running tests, or working on the codebase — see [DEVELOPMENT.md](DEVELOPMENT.md).
-
----
-
 ## Manual Tests
 
 ### Test: No network connection
@@ -766,3 +760,15 @@ Error [RATE_LIMITED]: Too many requests — retry after 30s
 - **Terminal (TTY):** human-readable tables and status messages.
 - **Output directory (`--outdir`):** structured directory tree with `messages.json` (full data) and `messages.md` (human-readable) at each level. See [Output Directory](#output-directory).
 - **Piped stdout (non-TTY):** JSON, suitable for chaining with `jq` or other tools.
+
+---
+
+## For Developers
+
+If you are a developer contributing to telegram-cli — building executables, running tests, or working on the codebase — see [DEVELOPMENT.md](DEVELOPMENT.md).
+
+---
+
+## Release notes:
+
+See [release-notes.md](release-notes.md).

@@ -24,13 +24,21 @@ Insert the new version entry **at the beginning** (after the header, at line 3) 
 
 ### 3. Write commit text proposal
 
-Rewrite the content of `<project-root>/commit-text-proposal.txt` in with the following format:
+Update **only** the workspace-root file: `commit-text-proposal.txt` (in the workspace root directory where this skill file is located, not in sub-project directories).
+
+Rewrite its content with the following format:
 
 ```
 <prefix>: Project: <project>. Version: <current version>. <short label for update>.
 ```
 
-`<prefix>` is optional. `<project>` is the sub-project path (e.g. `telegram/telegram-lib`). If one commit updates many sub-projects, write only about the main updated sub-project.
+**Parameters:**
+- `<prefix>` (optional): See prefix table below (e.g., `feat`, `fix`, `dist`).
+- `<project>`: Full sub-project path from workspace root (e.g., `telegram/telegram-lib` or `telegram/telegram-cli`).
+- `<current version>`: The version from the changed sub-project's `src/version.yaml` after Rule 1.
+- `<short label for update>`: Concise description of what changed (2-10 words).
+
+**Multi-sub-project updates:** If the same commit affects multiple sub-projects, mention **only the main/primary sub-project** that drove the changes.
 
 Prefixes:
 

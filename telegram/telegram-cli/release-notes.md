@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.7
+Added F10-a through F10-d init command UX improvements: (a) existing config detection with user choice to create example template, (b) display Ctrl+C interruption guidance before credential prompts, (c) graceful login code callback with KeyboardInterrupt support, (d) consistent error handling with friendly messages and no tracebacks. Added 20 comprehensive unit tests covering all new flows. All 115 tests pass.
+
 ## Version: 1.0.6
 Updated workspace pyproject.toml configuration: added `[tool.workspace.projects]` section to track sub-project dependencies, cleaned up outdated root-level dependencies, and updated ruff configuration. Enhanced post-task skill to use workspace configuration for dependency discovery. Restored telegram-cli.exe to release workflow assets. All 95 tests pass.
 

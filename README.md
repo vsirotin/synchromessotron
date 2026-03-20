@@ -22,59 +22,6 @@ Synchromessotron covers the full workflow: reading messages from messenger chann
 
 ---
 
-## Project Structure
-
-```
-synchromessotron/
-├── telegram/
-│   ├── telegram-lib/        # Core Telegram library (Python, Telethon)
-│   ├── telegram-cli/        # Command-line tool
-│   ├── telegram-web/        # Web application
-│   │   ├── frontend/        #   Angular SPA
-│   │   └── backend/         #   Python API server
-│   ├── telegram-web-server/ # Firebase deployment
-│   ├── telegram-windows/    # Windows app (GitHub Action build)
-│   └── telegram-macos/      # macOS app (GitHub Action build)
-├── vkontakte/               # VK.com integration (to be defined)
-├── project-plan.md          # Development roadmap and issue drafts
-└── README.md                # This file
-```
-
-### Dependency Graph
-
-```
-telegram-lib
-    └──► telegram-cli
-            └──► telegram-web (frontend + backend)
-                    ├──► telegram-web-server (Firebase deployment)
-                    ├──► telegram-windows   (desktop wrapper → .exe)
-                    └──► telegram-macos     (desktop wrapper → .app)
-```
-
----
-
-## Quick Start
-
-The `telegram-lib` subproject is the only one currently operational. To get started:
-
-```bash
-git clone https://github.com/vsirotin/synchromessotron.git
-cd synchromessotron
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-pytest tests/unit/
-```
-
-See [telegram-lib README](telegram/telegram-lib/README.md) for full setup including Telegram credentials.
-
----
-
-## Development
-
-See [DEVELOPMENT.md](DEVELOPMENT.md) for the architecture overview, sync algorithm details, and guide for adding new messenger integrations.
-
-See [project-plan.md](project-plan.md) for the development roadmap with planned issues for each subproject.
-
 ## License
 
 MIT
