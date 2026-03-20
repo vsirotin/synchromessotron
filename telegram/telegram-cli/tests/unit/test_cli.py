@@ -89,22 +89,25 @@ class TestBuildParser:
         parser = build_parser()
         args = parser.parse_args([
             "backup", "100", "--since=2026-03-01T00:00:00",
-            "--limit=500", "--output=out.json", "--estimate",
+            "--limit=500", "--outdir=/tmp/backups", "--media", "--estimate",
         ])
         assert args.command == "backup"
         assert args.dialog_id == 100
         assert args.since == "2026-03-01T00:00:00"
         assert args.limit == 500
-        assert args.output == "out.json"
+        assert args.outdir == "/tmp/backups"
+        assert args.media is True
         assert args.estimate is True
 
     def test_parser_backup_defaults(self):
-        """Backup defaults: limit=100, rest None/False."""
+        """Backup defaults: limit=100, outdir=None, flags=False."""
         parser = build_parser()
         args = parser.parse_args(["backup", "100"])
         assert args.limit == 100
         assert args.since is None
-        assert args.output is None
+        assert args.outdir is None
+        assert args.media is False
+        assert args.files is False
         assert args.estimate is False
 
     def test_parser_download_media(self):
@@ -196,12 +199,19 @@ class TestMain:
     def test_main_backup(self):
         """'backup' dispatches to run_backup with parsed args."""
         with patch("src.commands.backup.run_backup") as mock_b:
-            main(["backup", "100", "--limit=500", "--output=out.json", "--estimate"])
+            main(["backup", "100", "--limit=500", "--outdir=/tmp/backups", "--media", "--estimate"])
             mock_b.assert_called_once_with(
                 dialog_id=100,
                 since=None,
                 limit=500,
-                output="out.json",
+                outdir="/tmp/backups",
+                media=True,
+                files=False,
+                music=False,
+                voice=False,
+                links=False,
+                gifs=False,
+                members=False,
                 estimate=True,
             )
 

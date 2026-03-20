@@ -225,7 +225,14 @@ def run_backup(
     dialog_id: int,
     since: str | None = None,
     limit: int = 100,
-    output: str | None = None,
+    outdir: str | None = None,
+    media: bool = False,
+    files: bool = False,
+    music: bool = False,
+    voice: bool = False,
+    links: bool = False,
+    gifs: bool = False,
+    members: bool = False,
     estimate: bool = False,
 ) -> None:
     """Main entry point for the backup command."""
@@ -237,21 +244,20 @@ def run_backup(
 
     config = load_config()
     client = create_client(config["api_id"], config["api_hash"], config["session"])
-    output_path = Path(output) if output else None
+    
+    # Determine output directory: use outdir if provided, otherwise default
+    output_dir = Path(outdir) if outdir else Path("./synchromessotron")
+    output_file = output_dir / "messages.json"
 
     # T11 — check output dir write permission
-    if output_path:
-        _check_output_writable(output_path)
+    _check_output_writable(output_file)
 
     # T22 — scan existing
-    existing_ids: set[int] = set()
-    latest_local: datetime | None = None
-    if output_path:
-        existing_ids = _scan_existing(output_path)
-        latest_local = _latest_timestamp(output_path)
+    existing_ids: set[int] = _scan_existing(output_file)
+    latest_local: datetime | None = _latest_timestamp(output_file)
 
     result = asyncio.run(
-        _async_backup(client, dialog_id, since_dt, limit, existing_ids, latest_local, output_path)
+        _async_backup(client, dialog_id, since_dt, limit, existing_ids, latest_local, output_file)
     )
 
     if isinstance(result, tuple):
@@ -264,18 +270,15 @@ def run_backup(
     # Serialize
     data = [_message_to_dict(m) for m in messages]
 
-    if output_path:
-        # Merge with existing data
-        existing_data = _load_existing_data(output_path)
-        merged = _merge_messages(existing_data, data)
-        _atomic_write_json(output_path, merged)
-        _progress_done(len(data), elapsed, output_path, pauses)
-    else:
-        print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
+    # Merge with existing data and write to output directory
+    existing_data = _load_existing_data(output_file)
+    merged = _merge_messages(existing_data, data)
+    _atomic_write_json(output_file, merged)
+    _progress_done(len(data), elapsed, output_file, pauses)
 
 
 async def _async_backup(
-    client, dialog_id, since_dt, limit, existing_ids, latest_local, output_path,
+    client, dialog_id, since_dt, limit, existing_ids, latest_local, output_file,
 ):
     """Connect, paginate, disconnect. Returns (messages, pauses, elapsed) or TgResult on error."""
     async with client:
@@ -290,7 +293,7 @@ async def _async_backup(
         pages = math.ceil(new_to_fetch / PAGE_SIZE) if new_to_fetch else 0
 
         # T23 — progress stages 1-3
-        _progress_start(dialog_id, limit, since_dt, output_path)
+        _progress_start(dialog_id, limit, since_dt, output_file)
         _progress_local_scan(len(existing_ids), latest_local, new_to_fetch)
         _progress_estimate(new_to_fetch, pages)
 

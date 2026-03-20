@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.9
+Fixed backup tests: migrated from deprecated `--output` file parameter to `--outdir` directory parameter. Removed TestBackupStdout class (stdout backup no longer supported). Updated TestBackupToFile, TestResumable, and TestRateLimit to use directory API and `messages.json` output file. All 19 backup unit tests pass (was 19, refactored).
+
 ## Version: 1.0.8
 Init command decision tree rewrite: 5-step multi-branch flow with config existence detection, config location query, credentials notes prompt, example file creation offer, and comprehensive credential validation. Graceful Ctrl+C handling throughout with friendly cancellation messages (no tracebacks). Added 7 helper functions with proper error handling. All 115 unit tests pass (94 base + 21 new init-specific tests).
 

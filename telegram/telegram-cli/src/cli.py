@@ -54,7 +54,14 @@ def build_parser() -> argparse.ArgumentParser:
     bp.add_argument("dialog_id", type=int, help="Numeric dialog ID")
     bp.add_argument("--since", type=str, default=None, help="ISO 8601 timestamp for incremental backup")
     bp.add_argument("--limit", type=int, default=100, help="Maximum messages to retrieve (default: 100)")
-    bp.add_argument("--output", type=str, default=None, help="Write JSON output to this file")
+    bp.add_argument("--outdir", type=str, default=None, help="Root output directory (default: ./synchromessotron)")
+    bp.add_argument("--media", action="store_true", help="Also download photos and videos")
+    bp.add_argument("--files", action="store_true", help="Also download documents and file attachments")
+    bp.add_argument("--music", action="store_true", help="Also download audio tracks")
+    bp.add_argument("--voice", action="store_true", help="Also download voice messages")
+    bp.add_argument("--links", action="store_true", help="Also save link previews and URLs")
+    bp.add_argument("--gifs", action="store_true", help="Also download GIF animations")
+    bp.add_argument("--members", action="store_true", help="Also save dialog participant list")
     bp.add_argument("--estimate", action="store_true", help="Print time estimate and exit")
 
     # download-media (F6)
@@ -109,7 +116,14 @@ def main(argv: list[str] | None = None) -> None:
             dialog_id=args.dialog_id,
             since=args.since,
             limit=args.limit,
-            output=args.output,
+            outdir=args.outdir,
+            media=args.media,
+            files=args.files,
+            music=args.music,
+            voice=args.voice,
+            links=args.links,
+            gifs=args.gifs,
+            members=args.members,
             estimate=args.estimate,
         )
     elif args.command == "download-media":

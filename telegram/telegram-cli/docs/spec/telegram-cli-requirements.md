@@ -68,12 +68,12 @@ Error [RATE_LIMITED]: Too many requests — retry after 30s
 
 ### F1 — Backup message history
 
-Retrieve messages from a dialog for full or incremental backup.
+Retrieve messages from a dialog for full or incremental backup. Saves messages to a structured directory hierarchy. By default, only messages are backed up; use content flags to include media, documents, and other data.
 
 **Signature:**
 
 ```
-telegram-cli backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--output=FILE] [--estimate]
+telegram-cli backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--outdir=DIR] [--media] [--files] [--music] [--voice] [--links] [--gifs] [--members] [--estimate]
 ```
 
 **Arguments:**
@@ -83,39 +83,47 @@ telegram-cli backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--output=FILE] 
 | `dialog_id` | yes | int | Numeric ID of the dialog (use `get-dialogs` to find it). |
 | `--since` | no | ISO 8601 string | If set, only messages strictly after this timestamp are returned (incremental). If omitted, the most recent messages are returned (full). |
 | `--limit` | no | int | Maximum number of messages to return. Default: `100`. |
-| `--output` | no | file path | Write JSON output to this file instead of stdout. |
-| `--estimate` | no | flag | Instead of running the backup, print an approximate time estimate and exit. Connects briefly to Telegram to determine data volume (see estimation mechanism below). |
+| `--outdir` | no | directory path | Root output directory where the backup directory structure is created. Default: `./synchromessotron` (created in current working directory). |
+| `--media` | no | flag | Also download photos and videos. |
+| `--files` | no | flag | Also download documents and file attachments. |
+| `--music` | no | flag | Also download audio tracks. |
+| `--voice` | no | flag | Also download voice messages. |
+| `--links` | no | flag | Also save link previews and URLs. |
+| `--gifs` | no | flag | Also download GIF animations. |
+| `--members` | no | flag | Also save dialog participant list. |
+| `--estimate` | no | flag | Instead of running the backup, print an approximate time estimate and exit. Does not write any files; independent of `--outdir`. |
 
 **Examples:**
 
 ```bash
-# Full backup — last 500 messages, save to file
-telegram-cli backup -1001234567890 --limit=500 --output=backup.json
+# Full backup — last 500 messages, to default directory
+telegram-cli backup -1001234567890 --limit=500
 
 # Incremental backup — only new messages since a date
-telegram-cli backup -1001234567890 --since="2026-03-01T00:00:00" --output=incremental.json
+telegram-cli backup -1001234567890 --since="2026-03-01T00:00:00"
 
-# Quick preview — last 10 messages to stdout
-telegram-cli backup -1001234567890 --limit=10
+# Backup messages and media to custom directory
+telegram-cli backup -1001234567890 --limit=500 --outdir=/data/backups --media
 
-# Estimate how long a backup would take
+# Backup everything (messages, media, documents, voice, etc.)
+telegram-cli backup -1001234567890 --media --files --music --voice --links --gifs --members
+
+# Estimate how long a backup would take (no files written)
 telegram-cli backup -1001234567890 --limit=5000 --estimate
 ```
 
-**Output:** JSON array of message objects (id, dialog_id, text, date, sender_name, has_media).
+**Output:** Structured directory tree with `messages.json` and `messages.md` at leaf levels. Additional content types (media, files, etc.) saved in subdirectories.
 
 **Estimation mechanism (`--estimate`):**
 
-The Telegram API enforces rate limits: when too many requests are made in a short time, the server responds with a `FloodWaitError` containing a cooldown period (typically 5–30 seconds). This makes large backup durations hard to predict without understanding the underlying rate-limit behaviour.
+The `--estimate` flag calculates how long a backup would take **without writing any files**. The result is independent of `--outdir` and other parameters that affect file operations.
 
 When `--estimate` is passed:
 
 1. The CLI calls `count_messages()` (telegram-lib) to obtain the total number of messages matching the query (dialog, `--since`, `--limit`) **without downloading message content**. This is a single lightweight API call using Telethon's `client.get_messages(entity, limit=0)` → `.total`.
 2. The number of API pages is calculated: `pages = ceil(min(total, limit) / page_size)`.
-3. The estimated duration is: `pages × (avg_page_fetch_ms + expected_cooldown_overhead_ms)`.
-   - `avg_page_fetch_ms` is an empirical constant (the average time to fetch one page of messages excluding cooldown).
-   - `expected_cooldown_overhead_ms` accounts for Telegram rate-limit pauses. Since Telegram's rate limits are not publicly documented and vary by account, this is a conservative heuristic.
-4. The result is printed as a human-readable estimate and the CLI exits without performing the actual backup.
+3. The estimated duration accounts for Telegram rate-limit pauses. Since Telegram's rate limits are not publicly documented and vary by account, this is a conservative heuristic.
+4. The result is printed as a human-readable estimate and the CLI exits without performing the actual backup or creating any files.
 
 **Example `--estimate` output:**
 
@@ -123,7 +131,44 @@ When `--estimate` is passed:
 ≈ 12 minutes (5000 messages, 50 pages, estimated 14.4 s/page incl. rate-limit pauses)
 ```
 
-The estimate is approximate — actual duration depends on network speed, server load, and per-account rate limits.
+The estimate is approximate — actual duration depends on network speed, server load, and per-account rate limits. No data is written when `--estimate` is used.
+
+**Output directory structure (when backup runs without `--estimate`):**
+
+Data is organized hierarchically under `--outdir` (default: `./synchromessotron`):
+
+```
+<outdir>/
+└── <dialog_name>_<dialog_id>/
+    ├── messages.json                 (all messages in JSON format)
+    ├── messages.md                   (human-readable: author, timestamp, text)
+    ├── 2026/                         (year directory)
+    │   ├── 01/                       (month, if > split_threshold messages)
+    │   │   ├── 01/                   (day, if > split_threshold messages)
+    │   │   │   ├── messages.json
+    │   │   │   └── messages.md
+    │   │   └── 02/
+    │   │       ├── messages.json
+    │   │       └── messages.md
+    │   └── 02/
+    │       ├── messages.json
+    │       └── messages.md
+    ├── media/                        (if --media flag used)
+    ├── files/                        (if --files flag used)
+    ├── music/                        (if --music flag used)
+    ├── voice/                        (if --voice flag used)
+    ├── links/                        (if --links flag used)
+    ├── gifs/                         (if --gifs flag used)
+    └── members/                      (if --members flag used)
+```
+
+Splitting decisions (controlled by `split_threshold` in `config.yaml`, default: 50):
+- **Year** directory always created.
+- If year > threshold → create **month** subdirectories.
+- If month > threshold → create **day** subdirectories.
+- If day > threshold → create **hour** subdirectories.
+- If hour > threshold → create **minute** subdirectories.
+- Messages stored only at the leaf level.
 
 **Possible errors:**
 
@@ -259,7 +304,7 @@ Retrieve the user's Telegram dialogs (all conversations: users, groups, channels
 **Signature:**
 
 ```
-telegram-cli get-dialogs [--limit=N] [--output=FILE]
+telegram-cli get-dialogs [--limit=N] [--outdir=DIR]
 ```
 
 **Arguments:**
@@ -267,21 +312,21 @@ telegram-cli get-dialogs [--limit=N] [--output=FILE]
 | Argument | Required | Type | Description |
 |----------|----------|------|-------------|
 | `--limit` | no | int | Maximum number of dialogs to return. Default: all (no limit). |
-| `--output` | no | file path | Write JSON output to this file instead of stdout. |
+| `--outdir` | no | directory path | Save `dialogs.json` to this directory (if omitted, only print to stdout). |
 
 **Examples:**
 
 ```bash
-# Print all dialogs as a table
+# Print all dialogs as a table to stdout
 telegram-cli get-dialogs
 
-# Save first 50 dialogs to a file
-telegram-cli get-dialogs --limit=50 --output=dialogs.json
+# Save first 50 dialogs to a JSON file in specified directory
+telegram-cli get-dialogs --limit=50 --outdir=/data/backups
 ```
 
 **Output (stdout):** Human-readable table with columns: TYPE, ID, NAME.
 
-**Output (file):** JSON array of dialog objects (id, name, type, username, unread_count).
+**Output (file):** JSON array of dialog objects (id, name, type, username, unread_count), written to `dialogs.json` in the specified `--outdir`.
 
 **Possible errors:**
 

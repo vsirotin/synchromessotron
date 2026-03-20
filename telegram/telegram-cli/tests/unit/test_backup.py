@@ -148,17 +148,19 @@ class TestEstimate:
 
 
 # ---------------------------------------------------------------------------
-# Backup to stdout tests
+# Backup to file tests (T21 atomic write)
 # ---------------------------------------------------------------------------
 
 
-class TestBackupStdout:
+class TestBackupToFile:
 
-    def test_backup_stdout_happy(self, capsys):
-        """Backup without --output prints JSON to stdout."""
-        msgs = [_make_msg(1, "Hello", 0), _make_msg(2, "World", 1)]
+    def test_backup_to_file(self, tmp_path, capsys):
+        """Backup with --outdir writes JSON to messages.json atomically."""
+        msgs = [_make_msg(1, "Hello"), _make_msg(2, "World")]
         count_result = _FakeResult(payload=2)
         page_result = _FakeResult(payload=msgs)
+        output_dir = tmp_path / "backup"
+        output_file = output_dir / "messages.json"
 
         with (
             patch("src.commands.backup.load_config", return_value={
@@ -172,39 +174,14 @@ class TestBackupStdout:
             mock_cc.return_value = _make_client_mock()
 
             from src.commands.backup import run_backup
-            run_backup(dialog_id=100, limit=100)
+            run_backup(dialog_id=100, limit=100, outdir=str(output_dir))
 
-        out = capsys.readouterr().out
-        # The JSON array is printed after progress lines.
-        # Find it by looking for '  {' which is indented JSON object start.
-        lines = out.strip().split("\n")
-        json_lines = []
-        capture = False
-        depth = 0
-        for line in lines:
-            stripped = line.strip()
-            if not capture and stripped == "[":
-                # Could be progress bar or JSON start — check if next char is not box-drawing
-                if not any(c in line for c in "\u2588\u2591"):
-                    capture = True
-                    json_lines.append(line)
-                    depth += 1
-                    continue
-            if capture:
-                json_lines.append(line)
-                if stripped.startswith("["):
-                    depth += 1
-                if stripped.endswith("]"):
-                    depth -= 1
-                    if depth == 0:
-                        break
-        assert json_lines, f"No JSON array found in output: {out}"
-        data = json.loads("\n".join(json_lines))
+        assert output_file.exists()
+        data = json.loads(output_file.read_text())
         assert len(data) == 2
-        assert data[0]["id"] == 1
-        assert data[1]["text"] == "World"
+        assert data[0]["text"] == "Hello"
 
-    def test_backup_error(self, capsys):
+    def test_backup_error(self, tmp_path):
         """Backup with API error exits 2."""
         count_result = _FakeResult(payload=10)
         err = _FakeError("ENTITY_NOT_FOUND", "No such dialog")
@@ -223,42 +200,8 @@ class TestBackupStdout:
 
             from src.commands.backup import run_backup
             with pytest.raises(SystemExit) as exc_info:
-                run_backup(dialog_id=999, limit=100)
+                run_backup(dialog_id=999, limit=100, outdir=str(tmp_path))
             assert exc_info.value.code == 2
-
-
-# ---------------------------------------------------------------------------
-# Backup to file tests (T21 atomic write)
-# ---------------------------------------------------------------------------
-
-
-class TestBackupToFile:
-
-    def test_backup_to_file(self, tmp_path, capsys):
-        """Backup with --output writes JSON to file atomically."""
-        msgs = [_make_msg(1, "Hello"), _make_msg(2, "World")]
-        count_result = _FakeResult(payload=2)
-        page_result = _FakeResult(payload=msgs)
-        output_file = tmp_path / "backup.json"
-
-        with (
-            patch("src.commands.backup.load_config", return_value={
-                "api_id": 1, "api_hash": "a", "session": "s"
-            }),
-            patch("src.commands.backup.create_client") as mock_cc,
-            patch("src.commands.backup.count_messages", new_callable=AsyncMock, return_value=count_result),
-            patch("src.commands.backup.read_messages", new_callable=AsyncMock, return_value=page_result),
-            patch("src.commands.backup._is_tty", return_value=False),
-        ):
-            mock_cc.return_value = _make_client_mock()
-
-            from src.commands.backup import run_backup
-            run_backup(dialog_id=100, limit=100, output=str(output_file))
-
-        assert output_file.exists()
-        data = json.loads(output_file.read_text())
-        assert len(data) == 2
-        assert data[0]["text"] == "Hello"
 
 
 # ---------------------------------------------------------------------------
@@ -272,7 +215,7 @@ class TestResumable:
         """_scan_existing returns set of message IDs from existing file."""
         from src.commands.backup import _scan_existing
 
-        f = tmp_path / "backup.json"
+        f = tmp_path / "messages.json"
         f.write_text(json.dumps([
             {"id": 1, "text": "a", "date": "2026-06-01T12:00:00+00:00"},
             {"id": 2, "text": "b", "date": "2026-06-01T12:01:00+00:00"},
@@ -284,14 +227,14 @@ class TestResumable:
         """_scan_existing returns empty set for nonexistent file."""
         from src.commands.backup import _scan_existing
 
-        ids = _scan_existing(tmp_path / "nope.json")
+        ids = _scan_existing(tmp_path / "messages.json")
         assert ids == set()
 
     def test_latest_timestamp(self, tmp_path):
         """_latest_timestamp returns the max date from existing file."""
         from src.commands.backup import _latest_timestamp
 
-        f = tmp_path / "backup.json"
+        f = tmp_path / "messages.json"
         f.write_text(json.dumps([
             {"id": 1, "date": "2026-06-01T12:00:00+00:00"},
             {"id": 2, "date": "2026-06-01T13:00:00+00:00"},
@@ -302,8 +245,10 @@ class TestResumable:
 
     def test_resumable_skips_existing(self, tmp_path, capsys):
         """Backup with existing output skips already-downloaded messages."""
-        # Existing file has msg 1
-        output_file = tmp_path / "backup.json"
+        # Create output directory with existing messages file
+        output_dir = tmp_path / "backup"
+        output_dir.mkdir()
+        output_file = output_dir / "messages.json"
         output_file.write_text(json.dumps([
             {"id": 1, "dialog_id": 100, "text": "Old", "date": "2026-06-01T12:00:00+00:00",
              "sender_id": None, "sender_name": None, "has_media": False},
@@ -327,7 +272,7 @@ class TestResumable:
             mock_cc.return_value = _make_client_mock()
 
             from src.commands.backup import run_backup
-            run_backup(dialog_id=100, limit=100, output=str(output_file))
+            run_backup(dialog_id=100, limit=100, outdir=str(output_dir))
 
         data = json.loads(output_file.read_text())
         # Should have both messages merged
@@ -343,7 +288,7 @@ class TestResumable:
 
 class TestRateLimit:
 
-    def test_rate_limit_retry(self, capsys):
+    def test_rate_limit_retry(self, capsys, tmp_path):
         """Rate-limited page is retried after sleep."""
         msgs = [_make_msg(1, "Hello")]
         count_result = _FakeResult(payload=1)
@@ -373,7 +318,7 @@ class TestRateLimit:
             mock_cc.return_value = _make_client_mock()
 
             from src.commands.backup import run_backup
-            run_backup(dialog_id=100, limit=100)
+            run_backup(dialog_id=100, limit=100, outdir=str(tmp_path))
 
         out = capsys.readouterr().out
         assert "Hello" in out or "1" in out
