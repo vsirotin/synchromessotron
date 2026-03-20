@@ -26,7 +26,7 @@ class TestGetCliVersion:
         """Happy path: version.yaml is readable and well-formed."""
         result = get_cli_version()
         assert re.match(r"^\d+\.\d+\.\d+$", result["version"])
-        assert result["build"] == 1
+        assert "build" in result and isinstance(result["build"], int)
         assert "datetime" in result
 
     def test_get_cli_version_missing(self, tmp_path):

@@ -25,12 +25,19 @@ permissions:
 
 jobs:
   # -------------------------------------------------------------------
+  # 0. Quality Gate — ensure all tests pass before building
+  # -------------------------------------------------------------------
+  quality-gate:
+    uses: ./.github/workflows/quality-gate.yml
+
+  # -------------------------------------------------------------------
   # 1. Python variant (.pyz) — shiv on Ubuntu
   # -------------------------------------------------------------------
   build-pyz:
+    needs: [quality-gate]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -44,7 +51,7 @@ jobs:
         run: bash telegram/telegram-cli/tools/build_pyz.sh
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: telegram-cli-pyz
           path: telegram/telegram-cli/dist/telegram-cli.pyz
@@ -53,9 +60,10 @@ jobs:
   # 2. Windows variant (.exe) — PyInstaller
   # -------------------------------------------------------------------
   build-windows:
+    needs: [quality-gate]
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -70,7 +78,7 @@ jobs:
         run: bash telegram/telegram-cli/tools/build_windows.sh
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: telegram-cli-exe
           path: telegram/telegram-cli/dist/telegram-cli.exe
@@ -79,9 +87,10 @@ jobs:
   # 3. macOS variant — PyInstaller + zip
   # -------------------------------------------------------------------
   build-macos:
+    needs: [quality-gate]
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -95,7 +104,7 @@ jobs:
         run: bash telegram/telegram-cli/tools/build_macos.sh
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: telegram-cli-macos
           path: telegram/telegram-cli/dist/telegram-cli-macos.zip
@@ -107,10 +116,10 @@ jobs:
     needs: [build-pyz, build-windows, build-macos]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: release-assets
           merge-multiple: true

@@ -18,6 +18,7 @@ on:
     branches: ["**"]
   pull_request:
     branches: ["main"]
+  workflow_call:
 
 # ───────────────────────────────────────────────────────────────────────────
 # 1. Detect which sub-projects have changed files
@@ -31,7 +32,7 @@ jobs:
       # ↓ future sub-projects register their outputs here
       # vkontakte:    ${{ steps.filter.outputs.vkontakte }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dorny/paths-filter@v3
         id: filter

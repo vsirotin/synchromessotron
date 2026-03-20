@@ -676,7 +676,7 @@ No parameters.
 | **macOS** | `./telegram-cli version` |
 | **Python** | `python3 telegram-cli.pyz version` |
 
-**Expected result:**
+**Expected result - something like:**
 
 ```json
 {
