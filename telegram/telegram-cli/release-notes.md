@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.10
+Enhanced release workflow: (1) Distinguished draft releases (v1.0.0 tags) and stable releases (v1.0.0-stable tags) — stable releases marked as stable on GitHub Releases page, draft releases marked as Draft; (2) Removes auto-generated source code archives (.zip, .tar.gz) from releases, keeping only the 3 executable distributions (.pyz, .exe, .zip); (3) Added set-tag.sh script in tools/ for streamlined release tagging with automatic version.yaml updates, release-notes.md entries, and commit-text-proposal.txt generation.
+
 ## Version: 1.0.9
 Fixed backup tests: migrated from deprecated `--output` file parameter to `--outdir` directory parameter. Removed TestBackupStdout class (stdout backup no longer supported). Updated TestBackupToFile, TestResumable, and TestRateLimit to use directory API and `messages.json` output file. All 19 backup unit tests pass (was 19, refactored).
 

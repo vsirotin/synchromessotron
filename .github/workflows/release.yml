@@ -118,6 +118,20 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Check if stable tag
+        id: check-tag
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [[ "$TAG" == *"-stable"* ]]; then
+            echo "is_stable=true" >> $GITHUB_OUTPUT
+            echo "draft=false" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          else
+            echo "is_stable=false" >> $GITHUB_OUTPUT
+            echo "draft=true" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Download all artifacts
         uses: actions/download-artifact@v5
         with:
@@ -132,5 +146,21 @@ jobs:
               release-assets/telegram-cli.exe
               release-assets/telegram-cli-macos.zip
             generate_release_notes: true
-            draft: true
-            prerelease: true
+            draft: ${{ steps.check-tag.outputs.draft == 'true' }}
+            prerelease: ${{ steps.check-tag.outputs.prerelease == 'true' }}
+
+      - name: Remove source code archives
+        if: always()
+        run: |
+          TAG="${{ github.ref_name }}"
+          echo "Attempting to remove auto-generated source code archives for tag: $TAG"
+          
+          # Try to delete the zip and tar.gz archives that GitHub creates automatically
+          for asset in "Source code (zip)" "Source code (tar.gz)"; do
+            if gh release view "$TAG" --json assets -q '.assets[].name' | grep -q "^${asset}$"; then
+              echo "Deleting: $asset"
+              gh release delete-asset "$TAG" "$asset" 2>/dev/null || echo "Could not delete $asset (may be protected)"
+            fi
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

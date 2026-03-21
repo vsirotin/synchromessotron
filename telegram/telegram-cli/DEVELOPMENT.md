@@ -65,9 +65,44 @@ The GitHub Actions workflow `.github/workflows/release.yml` calls the same `tool
 
 #### How to trigger a release
 
-**Terminal:**
+Release tags control whether a release appears as **Draft** or **Stable** on the GitHub Releases page:
+
+- **`v1.0.0`** (without `-stable` suffix) → Release marked as **Draft** with auto-generated release notes.
+- **`v1.0.0-stable`** (with `-stable` suffix) → Release marked as **Stable** and promoted on the Releases page.
+
+**Use the set-tag.sh script:**
 
 ```bash
+cd telegram/telegram-cli
+bash tools/set-tag.sh v1.0.0
+```
+
+The script:
+1. Prompts you to enter release notes for the new version.
+2. Automatically updates `src/version.yaml` with the new version, build number, and datetime.
+3. Prepends the release notes entry to `release-notes.md`.
+4. Updates `commit-text-proposal.txt` with the commit message template.
+5. Creates the Git tag and pushes it to trigger the CI release workflow.
+
+**To mark an existing release as stable:**
+
+After the v1.0.0 release is published, create a secondary stable tag:
+
+```bash
+bash tools/set-tag.sh v1.0.0-stable
+```
+
+This does _not_ update version files (since the release already exists) — it only creates the stable tag to promote the release on GitHub.
+
+**Manual alternative (if needed):**
+
+If you prefer to create tags manually (not recommended):
+
+```bash
+# Push changes first
+git push
+
+# Create and push tag manually
 git tag v1.0.0
 git push origin v1.0.0
 ```
@@ -76,7 +111,7 @@ git push origin v1.0.0
 
 1. Open the **Source Control** panel (⌃⇧G / Ctrl+Shift+G).
 2. Commit and push all changes.
-3. Open the **Command Palette** (⌘⇧P / Ctrl+Shift+P) → type **Git: Create Tag** → enter the tag name (e.g. `v1.0.0`).
+3. Open the **Command Palette** (⌘⇧P / Ctrl+Shift+P) → type **Git: Create Tag** → enter the tag name (e.g. `v1.0.0` or `v1.0.0-stable`).
 4. Open the **Command Palette** again → **Git: Push Tags**.
 
 #### How to monitor the build
