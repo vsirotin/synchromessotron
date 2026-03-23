@@ -34,4 +34,6 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
+testpaths = ["tests/unit"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]

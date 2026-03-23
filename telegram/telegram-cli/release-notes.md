@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.13
+Fixed pytest test discovery error: (1) Updated `pyproject.toml` to restrict pytest `testpaths` from `tests/` to `tests/unit/` only; (2) Added explicit `python_files` and `python_functions` patterns to prevent pytest from discovering integration test module functions as test fixtures; (3) CI/CD no longer fails with "fixture 'cli' not found" error when running quality-gate workflow. Integration tests remain in `tests/post_build/` and are executed via custom runners (`run_integration_tests.py`, `run_post_build_test.py`), not pytest.
+
 ## Version: 1.0.12
 Simplified release tagging workflow: (1) Moved `set-tag.sh` from `tools/` to workspace root at `set-tag.sh`; (2) Removed automated version file updates from script — versions now managed by post-task workflow only; (3) Script now performs simple `git tag` and `git push` operations only; (4) Updated DEVELOPMENT.md tagging documentation with new script location and manual version update instructions. Release workflow remains unchanged; users must manually update version.yaml, release-notes.md, and commit-text-proposal.txt before tagging.
 
