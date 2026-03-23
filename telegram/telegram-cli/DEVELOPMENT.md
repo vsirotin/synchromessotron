@@ -185,63 +185,7 @@ python3 -m src ping
 
 ---
 
-## 3. Project Structure
-
-```
-telegram/telegram-cli/
-├── pyproject.toml            # Package metadata, dependencies, pytest config
-├── README.md                 # End-user documentation
-├── DEVELOPMENT.md            # This file
-├── release-notes.md          # Changelog (appended per version)
-├── commit-text-proposal.txt  # Last proposed commit message
-├── docs/
-│   ├── images/               # Screenshots for README
-│   └── spec/
-│       └── telegram-cli-requirements.md   # Functional & technical requirements
-├── tools/
-│   ├── build_pyz.sh          # Build .pyz (shiv, cross-platform)
-│   ├── build_windows.sh      # Build .exe (PyInstaller, Windows)
-│   └── build_macos.sh        # Build macOS binary + zip (PyInstaller)
-├── src/
-│   ├── __init__.py           # Package docstring
-│   ├── __main__.py           # Entry point: python3 -m src / .pyz
-│   ├── cli.py                # argparse parser + command dispatch (T2)
-│   ├── config.py             # config.yaml loader (T1)
-│   ├── errors.py             # TgError → stderr formatting (T4)
-│   ├── version.py            # Reads version.yaml (F9)
-│   ├── version.yaml          # Current version, build, datetime
-│   ├── _lib.py               # Adapter for importing telegram-lib (see §6)
-│   ├── help_texts/           # i18n help text JSON files (T9)
-│   │   ├── en.json
-│   │   └── ...               # ru, fa, tr, ar, de (placeholders)
-│   └── commands/
-│       ├── __init__.py
-│       ├── init_cmd.py       # init command (F10)
-│       ├── whoami.py         # whoami command (F8)
-│       ├── ping.py           # ping command (F7)
-│       ├── get_dialogs.py    # get-dialogs command (F5)
-│       ├── send.py           # send command (F2)
-│       ├── edit.py           # edit command (F3)
-│       ├── delete.py         # delete command (F4)
-│       ├── backup.py         # backup command (F1)
-│       ├── download_media.py # download-media command (F6)
-│       ├── help_cmd.py       # help command (F11)
-│       └── version_cmd.py    # version command (F9)
-└── tests/
-    └── unit/
-        ├── __init__.py
-        ├── test_cli.py       # Parser + dispatch tests
-        ├── test_commands.py  # Command handler tests
-        ├── test_backup.py    # Backup command tests
-        ├── test_config.py    # Config loader tests
-        ├── test_errors.py    # Error formatting tests
-        ├── test_timeout.py   # Timeout handling tests
-        └── test_version.py   # Version command tests
-```
-
----
-
-## 4. Testing
+## 3. Testing
 
 ### Running tests
 
@@ -273,7 +217,7 @@ testpaths = ["tests"]
 
 ---
 
-## 5. Quality Gate CI
+## 4. Quality Gate CI
 
 The repository has a monorepo CI workflow at `.github/workflows/quality-gate.yml`. It detects which sub-projects have changed files and runs their test suites.
 
@@ -286,7 +230,7 @@ telegram-cli is registered in that workflow. On every push that touches files un
 
 ---
 
-## 6. Architecture Notes
+## 5. Architecture Notes
 
 ### _lib.py adapter
 
@@ -309,6 +253,105 @@ telegram-lib functions return `TgResult[T]` — a result type that is either `Tg
 1. Adding a subparser in `cli.py → build_parser()`.
 2. Creating `src/commands/<name>.py` with a `run_<name>()` function.
 3. Adding the dispatch branch in `cli.py → main()`.
+
+---
+
+## 6. Post-Build Integration Testing
+
+Simple, function-based integration test framework. No JSON DSL—just Python.
+
+### 6.1 Quick Start
+
+After building the CLI executable:
+
+```bash
+cd telegram/telegram-cli
+
+# Automatic: detects platform, finds executable, runs tests
+python3 tests/post_build/run_integration_tests.py
+
+# With rebuild (if you want to rebuild first)
+python3 tests/post_build/run_integration_tests.py --rebuild
+```
+
+### 6.2 How It Works
+
+#### Test Framework: `integration_test.py`
+
+Write tests using simple Python functions:
+
+```python
+from integration_test import test, check_json_valid, check_json_has_key
+
+# Example: test the version command
+test(
+    cli="python3 dist/telegram-cli.pyz",    # Platform-agnostic: works on any OS
+    command="version",
+    check_json_valid(),                      # Verify output is valid JSON
+    check_json_has_key("cli", contains={"version": None}),  # Check structure
+    check_json_has_key("lib", contains={"datetime": None})
+)
+```
+
+**Key point:** The `cli` parameter is passed to `test()`, making it **platform-independent**. The same test code runs on all platforms.
+
+#### Runner Script: `run_integration_tests.py`
+
+Automates test execution:
+
+```bash
+python3 run_integration_tests.py
+```
+
+The runner:
+1. Detects your platform (macOS, Windows, Linux)
+2. Looks for the built executable in `dist/`
+3. Runs `integration_test.py` with the correct CLI path
+4. Reports results
+
+**Note:** Tests assume `config.yaml` exists in the `dist/` directory with valid Telegram credentials. If config is missing or invalid, tests requiring network access will fail.
+
+### 6.3 Test Execution Flow
+
+**For developers (manual testing):**
+
+```bash
+cd telegram/telegram-cli
+python3 tests/post_build/run_integration_tests.py
+```
+
+**For CI/CD (post-build in dist/):**
+
+```bash
+cd telegram/telegram-cli/dist
+python3 ../tests/post_build/run_post_build_test.py
+```
+
+The runner:
+- Detects your platform (macOS, Windows, Linux)
+- Finds the built executable in the current directory
+- Runs integration tests using that executable
+- Reports test statistics (total checks, passed, failed)
+
+### 6.4 Available Check Functions
+
+Check functions are organized into modular files:
+
+**check_output_json.py:**
+- `check_json_valid()` — Verify output is valid JSON
+- `check_json_has_key(key, contains={...})` — Check JSON structure
+
+**check_stdout.py:**
+- `check_stdout_contains(text)` — Check for substring in output
+- `check_stdout_line_count(min=0, max=None)` — Verify line count
+
+### 6.5 Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | All checks passed |
+| 1 | One or more checks failed |
+| 2 | Executable not found or other error |
 
 ---
 

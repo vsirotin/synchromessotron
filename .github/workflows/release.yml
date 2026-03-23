@@ -50,6 +50,11 @@ jobs:
       - name: Build .pyz
         run: bash telegram/telegram-cli/tools/build_pyz.sh
 
+      - name: Post-build integration tests
+        run: |
+          cd telegram/telegram-cli/dist
+          python3 ../tests/post_build/run_post_build_test.py || exit 1
+
       - name: Upload artifact
         uses: actions/upload-artifact@v5
         with:
@@ -77,6 +82,12 @@ jobs:
         shell: bash
         run: bash telegram/telegram-cli/tools/build_windows.sh
 
+      - name: Post-build integration tests
+        shell: bash
+        run: |
+          cd telegram/telegram-cli/dist
+          python3 ../tests/post_build/run_post_build_test.py || exit 1
+
       - name: Upload artifact
         uses: actions/upload-artifact@v5
         with:
@@ -102,6 +113,11 @@ jobs:
 
       - name: Build macOS binary
         run: bash telegram/telegram-cli/tools/build_macos.sh
+
+      - name: Post-build integration tests
+        run: |
+          cd telegram/telegram-cli/dist
+          python3 ../tests/post_build/run_post_build_test.py || exit 1
 
       - name: Upload artifact
         uses: actions/upload-artifact@v5

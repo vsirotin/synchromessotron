@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.11
+Post-build integration testing: (1) Refactored `test()` function to return statistics tuple `(total_checks, passed_checks)` instead of exiting, enabling CI/CD result collection; (2) Created `run_post_build_test.py` for CI/CD-specific post-build test execution in dist/ directory; (3) Integrated post-build tests into release.yml workflow (3 build jobs: pyz, windows, macos) with automatic build failure on test failure; (4) Simplified DEVELOPMENT.md documentation — removed advanced developer extension guides, focused on usage. Framework continues execution on failures, collects all statistics, exits with status code based on total failures.
+
 ## Version: 1.0.10
 Enhanced release workflow: (1) Distinguished draft releases (v1.0.0 tags) and stable releases (v1.0.0-stable tags) — stable releases marked as stable on GitHub Releases page, draft releases marked as Draft; (2) Removes auto-generated source code archives (.zip, .tar.gz) from releases, keeping only the 3 executable distributions (.pyz, .exe, .zip); (3) Added set-tag.sh script in tools/ for streamlined release tagging with automatic version.yaml updates, release-notes.md entries, and commit-text-proposal.txt generation.
 
