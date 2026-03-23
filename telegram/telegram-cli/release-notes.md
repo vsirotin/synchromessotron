@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.14
+Fixed post-build test Unicode encoding error on Windows CI/CD: Wrapped stdout with UTF-8 encoding to handle Unicode characters (⚠, ✓, ✗) on systems using cp1252 default encoding. Windows platform no longer fails with "UnicodeEncodeError: 'charmap' codec can't encode character" when running post-build integration tests.
+
 ## Version: 1.0.13
 Fixed pytest test discovery error: (1) Updated `pyproject.toml` to restrict pytest `testpaths` from `tests/` to `tests/unit/` only; (2) Added explicit `python_files` and `python_functions` patterns to prevent pytest from discovering integration test module functions as test fixtures; (3) CI/CD no longer fails with "fixture 'cli' not found" error when running quality-gate workflow. Integration tests remain in `tests/post_build/` and are executed via custom runners (`run_integration_tests.py`, `run_post_build_test.py`), not pytest.
 

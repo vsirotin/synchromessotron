@@ -19,11 +19,16 @@ Pre-condition:
     - config.yaml exists in dist/ with valid Telegram credentials
 """
 
+import io
 import os
 import sys
 import platform
 import subprocess
 from pathlib import Path
+
+# Configure stdout to handle Unicode on Windows (cp1252) and other platforms
+if sys.stdout.encoding.lower() not in ('utf-8', 'utf8'):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 
 class PostBuildTestRunner:
