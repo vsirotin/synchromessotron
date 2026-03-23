@@ -73,39 +73,36 @@ Release tags control whether a release appears as **Draft** or **Stable** on the
 **Use the set-tag.sh script:**
 
 ```bash
-cd telegram/telegram-cli
-bash tools/set-tag.sh v1.0.0
+bash ../../set-tag.sh v1.0.0
 ```
 
 The script:
-1. Prompts you to enter release notes for the new version.
-2. Automatically updates `src/version.yaml` with the new version, build number, and datetime.
-3. Prepends the release notes entry to `release-notes.md`.
-4. Updates `commit-text-proposal.txt` with the commit message template.
-5. Creates the Git tag and pushes it to trigger the CI release workflow.
+1. Creates the Git tag locally.
+2. Pushes the tag to GitHub to trigger the CI release workflow.
+
+> **Note:** Version files (`src/version.yaml`, `release-notes.md`, `commit-text-proposal.txt`) must be updated manually before tagging. Typically done via the post-task workflow when completing development tasks.
 
 **To mark an existing release as stable:**
 
 After the v1.0.0 release is published, create a secondary stable tag:
 
 ```bash
-bash tools/set-tag.sh v1.0.0-stable
+bash ../../set-tag.sh v1.0.0-stable
 ```
 
-This does _not_ update version files (since the release already exists) — it only creates the stable tag to promote the release on GitHub.
+This only creates the stable tag to promote the release on GitHub.
 
-**Manual alternative (if needed):**
+**Manual alternative:**
 
-If you prefer to create tags manually (not recommended):
+You can also create and push tags manually:
 
 ```bash
-# Push changes first
-git push
-
-# Create and push tag manually
+# Create and push tag
 git tag v1.0.0
 git push origin v1.0.0
 ```
+
+The `set-tag.sh` script automates these two commands.
 
 **VS Code UI:**
 

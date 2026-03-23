@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.12
+Simplified release tagging workflow: (1) Moved `set-tag.sh` from `tools/` to workspace root at `set-tag.sh`; (2) Removed automated version file updates from script — versions now managed by post-task workflow only; (3) Script now performs simple `git tag` and `git push` operations only; (4) Updated DEVELOPMENT.md tagging documentation with new script location and manual version update instructions. Release workflow remains unchanged; users must manually update version.yaml, release-notes.md, and commit-text-proposal.txt before tagging.
+
 ## Version: 1.0.11
 Post-build integration testing: (1) Refactored `test()` function to return statistics tuple `(total_checks, passed_checks)` instead of exiting, enabling CI/CD result collection; (2) Created `run_post_build_test.py` for CI/CD-specific post-build test execution in dist/ directory; (3) Integrated post-build tests into release.yml workflow (3 build jobs: pyz, windows, macos) with automatic build failure on test failure; (4) Simplified DEVELOPMENT.md documentation — removed advanced developer extension guides, focused on usage. Framework continues execution on failures, collects all statistics, exits with status code based on total failures.
 
