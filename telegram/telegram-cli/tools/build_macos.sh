@@ -22,11 +22,10 @@ if [[ ! -f "$BUILD_VENV/bin/python" ]]; then
     python3 -m venv "$BUILD_VENV"
 fi
 PY="$BUILD_VENV/bin/python"
-PIP="$BUILD_VENV/bin/pip"
 PYINSTALLER="$BUILD_VENV/bin/pyinstaller"
 
 echo "==> Installing PyInstaller, build, and wheel..."
-"$PIP" install --quiet pyinstaller build wheel
+"$PY" -m pip install --quiet pyinstaller build wheel
 
 echo "==> Building telegram-lib wheel..."
 mkdir -p dist/wheels
@@ -35,10 +34,10 @@ cd "$LIB_DIR"
 cd "$PROJECT_DIR"
 
 echo "==> Installing telegram-lib from wheel..."
-"$PIP" install --quiet --find-links dist/wheels telegram-lib
+"$PY" -m pip install --quiet --find-links dist/wheels telegram-lib
 
 echo "==> Installing telegram-cli..."
-"$PIP" install --quiet .
+"$PY" -m pip install --quiet .
 
 echo "==> Building telegram-cli binary..."
 "$PYINSTALLER" ./telegram-cli.spec

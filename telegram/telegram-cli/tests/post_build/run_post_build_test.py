@@ -234,19 +234,28 @@ def main():
         
         # Check if development platform binary exists
         if not has_platform_binary:
-            print(f"\n⚠ Warning: No {platform_name} native binary found!")
-            print(f"  Attempting to rebuild...")
+            # In CI/CD mode with only .pyz, allow it (cross-platform)
+            # In developer mode, attempt rebuild
+            is_ci = os.environ.get('CI') == 'true' or os.environ.get('GITHUB_ACTIONS') == 'true'
             
-            if runner.rebuild_platform_binary():
-                # Re-scan for executables after rebuild
-                print(f"\n  Re-scanning for executables...")
-                executables, has_platform_binary = runner.get_all_cli_executables()
-                print(f"  Found: {len(executables)} executable(s)")
-                for name, cli in executables:
-                    print(f"    - {name}")
+            if is_ci and len(executables) > 0:
+                # CI/CD mode: .pyz alone is sufficient (cross-platform)
+                print(f"\n✓ CI/CD mode: Using {len(executables)} executable(s) for verification")
             else:
-                print(f"  Build failed. Cannot continue without platform binary.")
-                sys.exit(1)
+                # Developer mode: attempt to rebuild platform binary
+                print(f"\n⚠ Warning: No {platform_name} native binary found!")
+                print(f"  Attempting to rebuild...")
+                
+                if runner.rebuild_platform_binary():
+                    # Re-scan for executables after rebuild
+                    print(f"\n  Re-scanning for executables...")
+                    executables, has_platform_binary = runner.get_all_cli_executables()
+                    print(f"  Found: {len(executables)} executable(s)")
+                    for name, cli in executables:
+                        print(f"    - {name}")
+                else:
+                    print(f"  Build failed. Cannot continue without platform binary.")
+                    sys.exit(1)
         
         # Run version check for each executable
         total_tests_all = 0
