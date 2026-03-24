@@ -14,6 +14,22 @@ telegram-cli is distributed in three variants. Build scripts live in `tools/` an
 | Windows binary | `tools/build_windows.sh` | `dist/telegram-cli.exe` | Windows |
 | macOS binary | `tools/build_macos.sh` | `dist/telegram-cli-macos.zip` | macOS |
 
+### 1.0 Build all variants
+
+To build all three variants at once (useful for CI/CD or release preparation), use the workspace-level script:
+
+```bash
+cd <workspace-root>
+bash build_all.sh
+```
+
+This script:
+1. Builds the Python archive (.pyz) — always succeeds (Python + pip required)
+2. Attempts Windows binary (.exe) — may skip on non-Windows platforms
+3. Attempts macOS binary — may skip on non-macOS platforms
+
+Each build is independent. Failures in one build do not stop the others. All artifacts appear in `telegram/telegram-cli/dist/`.
+
 ### 1.1 Local build
 
 Run the script that matches your platform from the `telegram/telegram-cli` directory:

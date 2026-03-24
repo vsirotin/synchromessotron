@@ -151,6 +151,12 @@ def integration_test(cli: str) -> tuple[int, int, int]:
     Returns:
         Tuple of (total_tests, total_passed_checks, total_failed_checks)
     """
+    # Clean up test artifacts before starting
+    import shutil
+    test_output_dir = "synchromessotron"
+    if os.path.exists(test_output_dir):
+        shutil.rmtree(test_output_dir)
+    
     print(f"\n{'='*60}")
     print(f"Integration Tests for telegram-cli")
     print(f"CLI: {cli}")

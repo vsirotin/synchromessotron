@@ -1,5 +1,9 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.25
+
+Improved test cleanup and backup command progress output: (1) Added automatic cleanup of test artifacts — integration tests now delete `synchromessotron/` directory before starting, preventing stale data from interfering with results; (2) Fixed progress bar to show 100% completion at end of backup instead of intermediate percentage; (3) Updated final progress message to explicitly mention both `messages.json` and `messages.md` files that are created; (4) Created workspace-level `build_all.sh` script to build all three variants (Python archive, Windows binary, macOS binary) at once; (5) Added documentation in DEVELOPMENT.md section 1.0 describing the build_all.sh workflow for CI/CD and release preparation.
+
 ## Version: 1.0.24
 
 Fixed unit tests for backup command directory structure changes: (1) Added `_FakeDialogInfo` class to mock DialogInfo for testing; (2) Updated `test_backup_to_file`, `test_backup_error`, `test_resumable_skips_existing`, and `test_rate_limit_retry` to mock `get_dialogs` function calls; (3) Updated test assertions to expect files in new `<dialog_name>_<dialog_id>/` directory structure instead of flat backup directory; (4) All unit tests now pass with the new hierarchical directory structure for message backups.

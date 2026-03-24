@@ -159,15 +159,22 @@ def _progress_done(total_downloaded, elapsed, output_path, pauses):
     """Stage 5 — print final report."""
     if _is_tty():
         print()  # newline after progress bar
+    
     parts = [f"Done. {total_downloaded} messages saved"]
+    
     if output_path:
-        parts.append(f"to {output_path}")
+        # Show the directory containing both messages.json and messages.md
+        output_path = Path(output_path) if not isinstance(output_path, Path) else output_path
+        output_dir = output_path.parent
+        parts.append(f"to {output_dir}/")
+        parts.append("(messages.json + messages.md)")
+    
     parts.append(
         f"Total time: {_fmt_time(elapsed)}"
         + (f" ({pauses} rate-limit pauses)" if pauses else "")
         + "."
     )
-    print(". ".join(parts))
+    print(" ".join(parts))
 
 
 def _fmt_time(seconds: float) -> str:
@@ -391,6 +398,11 @@ async def _async_backup(
             _progress_bar(page_num, pages, fetched_count, new_to_fetch, elapsed, tty)
 
         elapsed = time.monotonic() - start_time
+        
+        # Show final progress bar at 100% completion
+        if tty:
+            _progress_bar(pages, pages, new_to_fetch, new_to_fetch, elapsed, tty)
+        
         return (all_messages, pauses, elapsed, output_file)
 
 
