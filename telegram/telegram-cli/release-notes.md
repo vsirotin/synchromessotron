@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.15
+Fixed post-build error detection: (1) Added `result.returncode` check in `run_tests()` method to catch subprocess failures; (2) When subprocess fails (including module import errors), RuntimeError is raised and propagates to main(), exiting with code 2; (3) Previously, subprocess failures were silently swallowed and treat as "no tests executed", causing GitHub Actions to show green instead of red. Now CI/CD workflow correctly fails when executable build verification encounters errors. Also upgraded `dorny/paths-filter@v3` to `@v4` to fix Node.js 20 deprecation warning.
+
 ## Version: 1.0.14
 Fixed post-build test Unicode encoding error on Windows CI/CD: Wrapped stdout with UTF-8 encoding to handle Unicode characters (⚠, ✓, ✗) on systems using cp1252 default encoding. Windows platform no longer fails with "UnicodeEncodeError: 'charmap' codec can't encode character" when running post-build integration tests.
 

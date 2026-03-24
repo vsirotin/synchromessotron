@@ -51,36 +51,42 @@ class PostBuildTestRunner:
         else:
             return "linux"
     
-    def get_cli_executable(self) -> str:
+    def get_all_cli_executables(self) -> list[tuple[str, str]]:
         """
-        Get the appropriate CLI executable path in current directory.
+        Get all available CLI executables in current directory.
         
         Returns:
-            CLI command (e.g., "python3 telegram-cli.pyz", "telegram-cli.exe", etc.)
+            List of tuples (name, command) for each available executable.
+            name: descriptive name (e.g., "Python archive", "macOS native")
+            command: executable command (e.g., "python3 telegram-cli.pyz", etc.)
         
         Raises:
-            FileNotFoundError: If no executable found
+            FileNotFoundError: If no executables found
         """
         platform_name = self.get_platform_name()
+        executables = []
         
-        # Check for .pyz first (most portable, works everywhere)
+        # Check for .pyz (portable, works on all platforms)
         if Path("telegram-cli.pyz").exists():
-            return "python3 telegram-cli.pyz"
+            executables.append(("Python archive (.pyz)", f"python3 {Path('telegram-cli.pyz').resolve()}"))
         
         # Platform-specific binaries
         if platform_name == "macos":
             if Path("telegram-cli").exists():
-                return "./telegram-cli"
+                executables.append(("macOS native binary", str(Path("telegram-cli").resolve())))
         
         elif platform_name == "windows":
             if Path("telegram-cli.exe").exists():
-                return "telegram-cli.exe"
+                executables.append(("Windows executable (.exe)", str(Path("telegram-cli.exe").resolve())))
         
-        # No executable found
-        raise FileNotFoundError(
-            f"No CLI executable found in {Path.cwd()}\n"
-            f"Expected: telegram-cli.pyz, telegram-cli (macOS), or telegram-cli.exe (Windows)"
-        )
+        # No executables found
+        if not executables:
+            raise FileNotFoundError(
+                f"No CLI executables found in {Path.cwd()}\n"
+                f"Expected: telegram-cli.pyz, telegram-cli (macOS), or telegram-cli.exe (Windows)"
+            )
+        
+        return executables
     
     def check_config_exists(self) -> bool:
         """Check if config.yaml exists in current directory."""
@@ -96,6 +102,9 @@ class PostBuildTestRunner:
         
         Returns:
             Tuple of (total_tests, total_checks, total_passed)
+            
+        Raises:
+            RuntimeError: If subprocess fails (non-zero exit code)
         """
         cmd = [
             sys.executable,
@@ -104,10 +113,15 @@ class PostBuildTestRunner:
             cli
         ]
         
+        # Prepare environment with PYTHONPATH for module imports
+        env = os.environ.copy()
+        env['PYTHONPATH'] = str(project_root)
+        
         try:
             result = subprocess.run(
                 cmd,
-                cwd=str(project_root),
+                cwd=str(Path.cwd()),  # Run from dist/ directory where config.yaml is located
+                env=env,
                 capture_output=True,
                 text=True,
                 timeout=120
@@ -118,6 +132,13 @@ class PostBuildTestRunner:
                 print(result.stdout)
             if result.stderr:
                 print(result.stderr, file=sys.stderr)
+            
+            # Check if subprocess failed
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"Subprocess failed with exit code {result.returncode}.\n"
+                    f"Command: {' '.join(cmd)}"
+                )
             
             # Parse statistics from output (simple pattern matching)
             # Expected format in stdout:
@@ -148,18 +169,18 @@ class PostBuildTestRunner:
             return (stats['tests'], stats['checks'], stats['passed'])
         
         except subprocess.TimeoutExpired:
-            print("✗ Tests timed out (120s)")
-            return (0, 0, 0)
+            raise RuntimeError("Tests timed out (120s)")
+        except RuntimeError:
+            raise
         except Exception as e:
-            print(f"✗ Error running tests: {e}")
-            return (0, 0, 0)
+            raise RuntimeError(f"Error running tests: {e}")
 
 
 def main():
     """Main entry point."""
     try:
         runner = PostBuildTestRunner()
-        project_root = runner.dist_dir.parent.parent
+        project_root = runner.dist_dir.parent  # telegram-cli root directory
         
         print(f"{'='*60}")
         print("Post-Build Integration Test Runner")
@@ -172,36 +193,64 @@ def main():
             print("\n⚠ Warning: config.yaml not found in current directory")
             print("  Some tests may fail without valid Telegram credentials")
         
-        # Get CLI executable
-        print(f"\nLooking for built executable...")
-        cli = runner.get_cli_executable()
-        print(f"  Found: {cli}")
+        # Get all available CLI executables
+        print(f"\nLooking for built executables...")
+        executables = runner.get_all_cli_executables()
+        for name, cli in executables:
+            print(f"  Found: {name}")
         
-        # Run tests
+        # Run tests for each executable
+        total_tests_all = 0
+        total_checks_all = 0
+        total_passed_all = 0
+        
+        for exec_name, cli in executables:
+            print(f"\n{'='*60}")
+            print(f"Testing: {exec_name}")
+            print(f"{'='*60}\n")
+            
+            total_tests, total_checks, total_passed = runner.run_tests(cli, project_root)
+            total_failed = total_checks - total_passed
+            
+            total_tests_all += total_tests
+            total_checks_all += total_checks
+            total_passed_all += total_passed
+            
+            # Print per-executable summary
+            print(f"\n{'-'*60}")
+            print(f"Summary for {exec_name}:")
+            print(f"  Tests executed: {total_tests}")
+            print(f"  Total checks: {total_checks}")
+            print(f"  Passed: {total_passed}")
+            print(f"  Failed: {total_failed}")
+            
+            if total_failed == 0 and total_checks > 0:
+                print(f"  ✓ All tests passed!")
+            elif total_checks == 0:
+                print(f"  ⚠ No tests were executed")
+            else:
+                print(f"  ✗ {total_failed} check(s) failed")
+        
+        # Print overall summary
         print(f"\n{'='*60}")
-        print("Running integration tests...\n")
+        print("Overall Test Summary:")
+        print(f"  Executables tested: {len(executables)}")
+        print(f"  Total tests executed: {total_tests_all}")
+        print(f"  Total checks: {total_checks_all}")
+        print(f"  Passed: {total_passed_all}")
+        print(f"  Failed: {total_checks_all - total_passed_all}")
         
-        total_tests, total_checks, total_passed = runner.run_tests(cli, project_root)
-        total_failed = total_checks - total_passed
-        
-        # Print summary
-        print(f"\n{'='*60}")
-        print("Post-Build Test Summary:")
-        print(f"  Tests executed: {total_tests}")
-        print(f"  Total checks: {total_checks}")
-        print(f"  Passed: {total_passed}")
-        print(f"  Failed: {total_failed}")
-        
-        if total_failed == 0 and total_checks > 0:
+        total_failed_all = total_checks_all - total_passed_all
+        if total_failed_all == 0 and total_checks_all > 0:
             print(f"\n✓ All tests passed!")
-        elif total_checks == 0:
+        elif total_checks_all == 0:
             print(f"\n⚠ No tests were executed")
         else:
-            print(f"\n✗ {total_failed} check(s) failed")
+            print(f"\n✗ {total_failed_all} check(s) failed")
         
         print(f"{'='*60}\n")
         
-        sys.exit(0 if total_failed == 0 else 1)
+        sys.exit(0 if total_failed_all == 0 else 1)
     
     except FileNotFoundError as e:
         print(f"\n✗ Error: {e}")

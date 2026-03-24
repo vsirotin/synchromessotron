@@ -262,7 +262,7 @@ Simple, function-based integration test framework. No JSON DSL—just Python.
 After building the CLI executable:
 
 ```bash
-cd telegram/telegram-cli
+cd telegram/telegram-cli/dist
 
 # Automatic: detects platform, finds executable, runs tests
 python3 tests/post_build/run_integration_tests.py

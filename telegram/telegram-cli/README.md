@@ -332,7 +332,7 @@ get-dialogs [--limit=N] [--outdir=DIR]
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--limit` | all | Maximum number of dialogs to return. |
+| `--limit` | 100 | Maximum number of dialogs to return. Omit to get the default 100. Use `--limit=500` or higher for more dialogs. |
 | `--outdir` | — | Save `dialogs.json` to this directory (see [Output Directory](#output-directory)). |
 
 **Call examples:**

@@ -15,7 +15,12 @@ from typing import Callable
 
 from .result import CheckResult
 from .check_output_json import check_json_valid, check_json_has_key
-from .check_stdout import check_stdout_contains, check_stdout_line_count
+from .check_stdout import (
+    check_stdout_contains,
+    check_stdout_line_count,
+    check_stdout_exact_line_count,
+    check_stdout_contains_line_with_parts,
+)
 def test(cli: str, command: str, *checks: Callable[..., CheckResult]) -> tuple[int, int]:
     """
     Run a single CLI command and validate against check functions.
@@ -97,6 +102,19 @@ def integration_test(cli: str) -> tuple[int, int, int]:
         check_json_valid(),
         check_json_has_key("cli", contains={"version": None}),
         check_json_has_key("lib", contains={"datetime": None})
+    )
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+    
+    # Test 2: get-dialogs command
+    test_name = "get-dialogs command with --limit=500"
+    print(f"\n[Test 2] {test_name}")
+    checks_count, passed_count = test(
+        cli,
+        "get-dialogs --limit=500",
+        check_stdout_exact_line_count(136),
+        check_stdout_contains_line_with_parts("User", "93372553", "BotFather", "@BotFather")
     )
     total_tests += 1
     total_checks += checks_count

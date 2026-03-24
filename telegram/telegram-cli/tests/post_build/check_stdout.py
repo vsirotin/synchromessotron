@@ -33,3 +33,27 @@ def check_stdout_line_count(
         expected_str = f"{min_lines}-{max_lines or 'inf'}" if max_lines else f">={min_lines}"
         return CheckResult(True, f"Output has {count} lines (expected {expected_str})")
     return _check
+
+
+def check_stdout_exact_line_count(expected_lines: int) -> Callable[[str], CheckResult]:
+    """Verify output has exactly the expected number of lines (excluding header/separator lines)."""
+    def _check(output: str) -> CheckResult:
+        lines = [line for line in output.split("\n") if line.strip() and not line.strip().startswith("-")]
+        count = len(lines)
+        
+        if count == expected_lines:
+            return CheckResult(True, f"Output has exactly {count} lines")
+        return CheckResult(False, f"Output has {count} lines, expected {expected_lines}")
+    return _check
+
+
+def check_stdout_contains_line_with_parts(*parts: str) -> Callable[[str], CheckResult]:
+    """Verify output contains a line with all specified parts."""
+    def _check(output: str) -> CheckResult:
+        lines = [line for line in output.split("\n") if line.strip()]
+        for line in lines:
+            if all(part in line for part in parts):
+                return CheckResult(True, f"Found line containing {parts}")
+        parts_str = ", ".join([f"'{p}'" for p in parts])
+        return CheckResult(False, f"No line found containing all parts: {parts_str}")
+    return _check
