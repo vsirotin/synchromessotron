@@ -49,7 +49,7 @@ class _FakeResult:
 
 
 class _FakeMessageInfo:
-    def __init__(self, id, dialog_id, text, date, sender_id=None, sender_name=None, has_media=False):
+    def __init__(self, id, dialog_id, text, date, sender_id=None, sender_name=None, has_media=False, media_type=None):
         self.id = id
         self.dialog_id = dialog_id
         self.text = text
@@ -57,6 +57,7 @@ class _FakeMessageInfo:
         self.sender_id = sender_id
         self.sender_name = sender_name
         self.has_media = has_media
+        self.media_type = media_type
 
 
 class _FakeDialogInfo:
@@ -273,7 +274,7 @@ class TestResumable:
         output_file = dialog_subdir / "messages.json"
         output_file.write_text(json.dumps([
             {"id": 1, "dialog_id": 100, "text": "Old", "date": "2026-06-01T12:00:00+00:00",
-             "sender_id": None, "sender_name": None, "has_media": False},
+             "sender_id": None, "sender_name": None, "has_media": False, "media_type": None},
         ]))
 
         # API returns msg 1 (existing) + msg 2 (new)

@@ -155,17 +155,16 @@ def _progress_bar(current_page, total_pages, fetched, total, elapsed, tty):
         print(line)
 
 
-def _progress_done(total_downloaded, elapsed, output_path, pauses):
+def _progress_done(total_downloaded, elapsed, output_dir, pauses):
     """Stage 5 — print final report."""
     if _is_tty():
         print()  # newline after progress bar
     
     parts = [f"Done. {total_downloaded} messages saved"]
     
-    if output_path:
+    if output_dir:
         # Show the directory containing both messages.json and messages.md
-        output_path = Path(output_path) if not isinstance(output_path, Path) else output_path
-        output_dir = output_path.parent
+        output_dir = Path(output_dir) if not isinstance(output_dir, Path) else output_dir
         parts.append(f"to {output_dir}/")
         parts.append("(messages.json + messages.md)")
     
@@ -244,6 +243,47 @@ async def _async_get_dialog_name(client, dialog_id: int) -> str:
     return str(dialog_id)
 
 
+def _get_media_category(media_type: str | None) -> str | None:
+    """Map Telethon media type to our subdirectory category.
+    
+    Returns:
+        Category name ("media", "files", "music", "voice", "links", "gifs") or None.
+    """
+    if not media_type:
+        return None
+    
+    media_type_lower = media_type.lower()
+    
+    # Photos and videos → media/
+    if any(x in media_type_lower for x in ["photo", "video"]):
+        return "media"
+    
+    # Audio files → check if music or voice
+    if "audio" in media_type_lower:
+        # Heuristic: if it has attributes suggesting music, classify as music
+        # Otherwise as voice for now (could be improved with metadata)
+        return "music"
+    
+    # Documents → files/
+    if any(x in media_type_lower for x in ["document", "file"]):
+        return "files"
+    
+    # Voice messages (specific type in Telethon)
+    if "voice" in media_type_lower:
+        return "voice"
+    
+    # Web page previews → links/
+    if any(x in media_type_lower for x in ["webpage", "webpage"]):
+        return "links"
+    
+    # Animated media (GIFs) → gifs/
+    if any(x in media_type_lower for x in ["animation", "gif", "animated"]):
+        return "gifs"
+    
+    # Fallback: treat unknown media types as "media"
+    return "media"
+
+
 def _generate_messages_md(messages: list[dict]) -> str:
     """Generate markdown representation of messages."""
     if not messages:
@@ -254,7 +294,9 @@ def _generate_messages_md(messages: list[dict]) -> str:
         sender = msg.get("sender_name") or f"User {msg.get('sender_id')}"
         date = msg.get("date", "")
         text = msg.get("text", "(no text)")
-        lines.append(f"## {sender} ({date})")
+        has_media = msg.get("has_media", False)
+        media_indicator = " [MEDIA]" if has_media else ""
+        lines.append(f"## {sender} ({date}){media_indicator}")
         lines.append(text)
         lines.append("")
     
@@ -289,10 +331,27 @@ def run_backup(
     # Determine output directory: use outdir if provided, otherwise default
     base_output_dir = Path(outdir) if outdir else Path("./synchromessotron")
     
+    # Build enabled media categories from flags
+    enabled_categories = set()
+    if media:
+        enabled_categories.add("media")
+    if files:
+        enabled_categories.add("files")
+    if music:
+        enabled_categories.add("music")
+    if voice:
+        enabled_categories.add("voice")
+    if links:
+        enabled_categories.add("links")
+    if gifs:
+        enabled_categories.add("gifs")
+    if members:
+        enabled_categories.add("members")
+    
     # Fetch dialog name and determine output file path
     # This will happen in _async_backup where we're in the proper async context
     result = asyncio.run(
-        _async_backup(client, dialog_id, since_dt, limit, base_output_dir)
+        _async_backup(client, dialog_id, since_dt, limit, base_output_dir, enabled_categories)
     )
     
     if not isinstance(result, tuple):
@@ -300,42 +359,75 @@ def run_backup(
         format_error_and_exit(result.error)
         return
     
-    messages, pauses, elapsed, output_file = result
+    messages, pauses, elapsed, output_dir = result
 
-    # Serialize
+    # Serialize all messages (both with and without media)
     data = [_message_to_dict(m) for m in messages]
 
-    # Merge with existing data and write to output directory
-    existing_data = _load_existing_data(output_file)
+    # Merge with existing data and write to main output directory
+    existing_data = _load_existing_data(output_dir / "messages.json")
     merged = _merge_messages(existing_data, data)
-    _atomic_write_json(output_file, merged)
+    _atomic_write_json(output_dir / "messages.json", merged)
     
     # Generate messages.md file
     md_content = _generate_messages_md(merged)
-    messages_md_path = output_file.parent / "messages.md"
+    messages_md_path = output_dir / "messages.md"
     messages_md_path.write_text(md_content, encoding="utf-8")
     
-    _progress_done(len(data), elapsed, output_file, pauses)
+    # If media categories are enabled, create subdirectories organized by media type
+    if enabled_categories:
+        # Group fetched messages by media category
+        by_category: dict[str, list] = {cat: [] for cat in enabled_categories}
+        
+        for msg in data:
+            media_type = msg.get("media_type")
+            if media_type:
+                category = _get_media_category(media_type)
+                if category and category in enabled_categories:
+                    by_category[category].append(msg)
+        
+        # Create subdirectories and save media category files
+        for category, cat_messages in by_category.items():
+            if cat_messages:  # Only create directory if there are messages in this category
+                cat_dir = output_dir / category
+                cat_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Load existing data for this category
+                cat_data_path = cat_dir / "messages.json"
+                existing_cat_data = _load_existing_data(cat_data_path)
+                merged_cat = _merge_messages(existing_cat_data, cat_messages)
+                
+                # Write category-specific files
+                _atomic_write_json(cat_data_path, merged_cat)
+                
+                # Generate category-specific markdown
+                cat_md = _generate_messages_md(merged_cat)
+                cat_md_path = cat_dir / "messages.md"
+                cat_md_path.write_text(cat_md, encoding="utf-8")
+    
+    _progress_done(len(data), elapsed, output_dir, pauses)
 
 
 async def _async_backup(
-    client, dialog_id, since_dt, limit, base_output_dir,
+    client, dialog_id, since_dt, limit, base_output_dir, enabled_categories=None,
 ):
     """Connect, fetch dialog info, paginate, disconnect. 
-    Returns (messages, pauses, elapsed, output_file) or TgResult on error."""
+    Returns (messages, pauses, elapsed, output_dir) or TgResult on error."""
+    if enabled_categories is None:
+        enabled_categories = set()
+    
     async with client:
         # Fetch dialog name first
         dialog_name = await _async_get_dialog_name(client, dialog_id)
         dialog_dir_name = f"{dialog_name}_{dialog_id}"
         output_dir = base_output_dir / dialog_dir_name
-        output_file = output_dir / "messages.json"
         
         # T11 — check output dir write permission
-        _check_output_writable(output_file)
+        _check_output_writable(output_dir / "messages.json")
         
         # T22 — scan existing
-        existing_ids: set[int] = _scan_existing(output_file)
-        latest_local: datetime | None = _latest_timestamp(output_file)
+        existing_ids: set[int] = _scan_existing(output_dir / "messages.json")
+        latest_local: datetime | None = _latest_timestamp(output_dir / "messages.json")
         
         # Determine total for progress
         count_result = await count_messages(client, dialog_id, since=since_dt)
@@ -348,7 +440,7 @@ async def _async_backup(
         pages = math.ceil(new_to_fetch / PAGE_SIZE) if new_to_fetch else 0
 
         # T23 — progress stages 1-3
-        _progress_start(dialog_id, dialog_name, limit, since_dt, output_file)
+        _progress_start(dialog_id, dialog_name, limit, since_dt, output_dir / "messages.json")
         _progress_local_scan(len(existing_ids), latest_local, new_to_fetch)
         _progress_estimate(new_to_fetch, pages)
 
@@ -403,7 +495,7 @@ async def _async_backup(
         if tty:
             _progress_bar(pages, pages, new_to_fetch, new_to_fetch, elapsed, tty)
         
-        return (all_messages, pauses, elapsed, output_file)
+        return (all_messages, pauses, elapsed, output_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -449,6 +541,7 @@ def _message_to_dict(msg) -> dict:
         "sender_id": msg.sender_id,
         "sender_name": msg.sender_name,
         "has_media": msg.has_media,
+        "media_type": msg.media_type,
     }
 
 

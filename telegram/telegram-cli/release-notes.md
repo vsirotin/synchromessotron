@@ -1,10 +1,12 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.26
+
+Implemented media subdirectory organization for backup command media flags: (1) Added `_get_media_category()` function to map Telethon media types (PhotoMedia, DocumentMedia, AudioMedia, etc.) to backup subdirectory categories (media/, files/, music/, voice/, links/, gifs/); (2) Modified `run_backup()` to accept media flags (--media, --files, --music, --voice, --links, --gifs, --members) and build set of enabled_categories; (3) Updated `_async_backup()` function signature to accept enabled_categories parameter and return output_dir instead of output_file; (4) Implemented media organization logic: when media flags are enabled, messages with media are filtered by type and saved to category-specific subdirectories with separate messages.json and messages.md files; (5) Added media_type field to message JSON output and markdown generation to show [MEDIA] indicator for messages with attachments; (6) Updated unit tests to include media_type field in _FakeMessageInfo; (7) Tested with real Telegram data: verified media/ subdirectory created with 10 photo/video messages and links/ subdirectory with 7 web page preview messages. Post-build verification passed for both Python archive and macOS binary.
+
 ## Version: 1.0.25
 
 Improved test cleanup and backup command progress output: (1) Added automatic cleanup of test artifacts — integration tests now delete `synchromessotron/` directory before starting, preventing stale data from interfering with results; (2) Fixed progress bar to show 100% completion at end of backup instead of intermediate percentage; (3) Updated final progress message to explicitly mention both `messages.json` and `messages.md` files that are created; (4) Created workspace-level `build_all.sh` script to build all three variants (Python archive, Windows binary, macOS binary) at once; (5) Added documentation in DEVELOPMENT.md section 1.0 describing the build_all.sh workflow for CI/CD and release preparation.
-
-## Version: 1.0.24
 
 Fixed unit tests for backup command directory structure changes: (1) Added `_FakeDialogInfo` class to mock DialogInfo for testing; (2) Updated `test_backup_to_file`, `test_backup_error`, `test_resumable_skips_existing`, and `test_rate_limit_retry` to mock `get_dialogs` function calls; (3) Updated test assertions to expect files in new `<dialog_name>_<dialog_id>/` directory structure instead of flat backup directory; (4) All unit tests now pass with the new hierarchical directory structure for message backups.
 
