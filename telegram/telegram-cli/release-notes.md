@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.18
+Fixed PyInstaller spec file path in build scripts: Changed relative path from `../telegram-cli.spec` to `./telegram-cli.spec` in both `build_macos.sh` and `build_windows.sh`. The incorrect path caused build failures with "Spec file not found" when scripts ran from the project root directory. This was not caught locally because build scripts were not executed during development.
+
 ## Version: 1.0.17
 Fixed PyInstaller bundling of telegram_lib: (1) Added `'telegram_lib'` to `hiddenimports` in `telegram-cli.spec`; (2) Updated `build_macos.sh` and `build_windows.sh` to use `telegram-cli.spec` instead of command-line PyInstaller invocation; (3) PyInstaller now includes the telegram_lib package when building .exe and macOS binaries, fixing "ModuleNotFoundError: No module named 'telegram_lib'" runtime errors; (4) Version output now works correctly in all distributed formats (.pyz, .exe, .bin). Created `telegram-cli-post-task` skill for pre-release verification (unit tests + post-build checks). Updated `release.yml` workflow labels from "Post-build integration tests" to "Post-build tests".
 
