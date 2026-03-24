@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.16
+Fixed post-build build verification: (1) Refactored `run_post_build_test.py` from attempting to run integration tests to quick build verification via `version` subcommand; (2) Added semantic version pattern regex to validate version output; (3) Now correctly tests each executable (.pyz, .exe, .bin) by running `<executable> version` and checking for valid version output (X.Y.Z format); (4) Full integration tests with config.yaml remain separate in `integration_test.py` and run via `run_integration_tests.py`; (5) Removed unused `integration_test_module` reference and PYTHONPATH configuration; (6) Simplified main() output to focus on executable build verification status rather than parsing test statistics.
+
 ## Version: 1.0.15
 Fixed post-build error detection: (1) Added `result.returncode` check in `run_tests()` method to catch subprocess failures; (2) When subprocess fails (including module import errors), RuntimeError is raised and propagates to main(), exiting with code 2; (3) Previously, subprocess failures were silently swallowed and treat as "no tests executed", causing GitHub Actions to show green instead of red. Now CI/CD workflow correctly fails when executable build verification encounters errors. Also upgraded `dorny/paths-filter@v3` to `@v4` to fix Node.js 20 deprecation warning.
 
