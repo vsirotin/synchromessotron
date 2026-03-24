@@ -312,23 +312,32 @@ The runner:
 
 **For developers (manual testing):**
 
-```bash
-cd telegram/telegram-cli
-python3 tests/post_build/run_integration_tests.py
-```
-
-**For CI/CD (post-build in dist/):**
+Always run from the `dist/` directory where `config.yaml` and the executable are located:
 
 ```bash
 cd telegram/telegram-cli/dist
-python3 ../tests/post_build/run_post_build_test.py
+python3 ../tests/post_build/run_integration_tests.py
 ```
 
 The runner:
 - Detects your platform (macOS, Windows, Linux)
 - Finds the built executable in the current directory
-- Runs integration tests using that executable
+- Runs integration tests using that executable (from dist/)
 - Reports test statistics (total checks, passed, failed)
+
+**Config file location:**
+
+Tests and the CLI expect `config.yaml` in the `dist/` directory (where the executable runs):
+
+```bash
+telegram/telegram-cli/dist/
+├── telegram-cli.pyz           # Executable
+├── config.yaml                # Required: Telegram credentials
+└── tmp1/                       # Test output directory
+    └── dialogs.json
+```
+
+Create `config.yaml` once and keep it in `dist/` for all test runs.
 
 ### 6.4 Available Check Functions
 

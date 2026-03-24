@@ -138,6 +138,7 @@ class IntegrationTestRunner:
         """
         # Run as a module to support relative imports
         # This ensures integration_test.py can import from check_*.py files
+        # IMPORTANT: Run from dist/ directory so CLI can find config.yaml there
         cmd = [
             sys.executable,
             "-m",
@@ -145,8 +146,13 @@ class IntegrationTestRunner:
             cli
         ]
         
+        # Set PYTHONPATH to include project root so modules can be imported
+        env = os.environ.copy()
+        env['PYTHONPATH'] = str(self.project_root)
+        
         try:
-            result = subprocess.run(cmd, cwd=str(self.project_root), timeout=120)
+            # Run tests from dist/ directory where config.yaml is expected
+            result = subprocess.run(cmd, cwd=str(self.dist_dir), env=env, timeout=120)
             sys.exit(result.returncode)
         except subprocess.TimeoutExpired:
             print(f"\n✗ Tests timed out (120s)")

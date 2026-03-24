@@ -6,6 +6,7 @@ with expected structure and values.
 """
 
 import json
+import os
 from typing import Any, Callable, Dict, Optional
 from .result import CheckResult
 
@@ -59,4 +60,126 @@ def check_json_has_key(
         
         return CheckResult(True, f"JSON contains key '{key}' with expected structure")
     
+    return _check
+
+
+def check_json_file_exists(filepath: str) -> Callable[[], CheckResult]:
+    """
+    Verify a JSON file exists at the specified path.
+    
+    Args:
+        filepath: Path to the JSON file to check
+    
+    Returns:
+        A function that returns CheckResult
+    """
+    def _check() -> CheckResult:
+        if not os.path.exists(filepath):
+            return CheckResult(False, f"File not found: {filepath}")
+        return CheckResult(True, f"File exists: {filepath}")
+    return _check
+
+
+def check_json_file_valid(filepath: str) -> Callable[[], CheckResult]:
+    """
+    Verify a file contains valid JSON.
+    
+    Args:
+        filepath: Path to the JSON file to check
+    
+    Returns:
+        A function that returns CheckResult
+    """
+    def _check() -> CheckResult:
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                json.load(f)
+            return CheckResult(True, f"File contains valid JSON: {filepath}")
+        except FileNotFoundError:
+            return CheckResult(False, f"File not found: {filepath}")
+        except json.JSONDecodeError as e:
+            return CheckResult(False, f"Invalid JSON in {filepath}: {e}")
+        except Exception as e:
+            return CheckResult(False, f"Error reading {filepath}: {e}")
+    return _check
+
+
+def check_json_array_length(filepath: str, expected_length: int) -> Callable[[], CheckResult]:
+    """
+    Verify a JSON file contains an array with the expected number of elements.
+    
+    Args:
+        filepath: Path to the JSON file to check
+        expected_length: Expected number of array elements
+    
+    Returns:
+        A function that returns CheckResult
+    """
+    def _check() -> CheckResult:
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            if not isinstance(data, list):
+                return CheckResult(False, f"File content is not a JSON array: {filepath}")
+            
+            actual_length = len(data)
+            if actual_length != expected_length:
+                return CheckResult(
+                    False, 
+                    f"Array length {actual_length} != expected {expected_length}"
+                )
+            
+            return CheckResult(True, f"Array contains {expected_length} elements")
+        except FileNotFoundError:
+            return CheckResult(False, f"File not found: {filepath}")
+        except json.JSONDecodeError as e:
+            return CheckResult(False, f"Invalid JSON in {filepath}: {e}")
+        except Exception as e:
+            return CheckResult(False, f"Error reading {filepath}: {e}")
+    return _check
+
+
+def check_json_contains_element(
+    filepath: str, 
+    match_fields: Dict[str, Any]
+) -> Callable[[], CheckResult]:
+    """
+    Verify a JSON array contains an element with specific field values.
+    
+    Args:
+        filepath: Path to the JSON file to check
+        match_fields: Dictionary of field names and values to match
+                     (e.g., {"id": -718738386, "type": "Chat"})
+    
+    Returns:
+        A function that returns CheckResult
+    """
+    def _check() -> CheckResult:
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            if not isinstance(data, list):
+                return CheckResult(False, f"File content is not a JSON array: {filepath}")
+            
+            # Search for element matching all fields
+            for element in data:
+                if not isinstance(element, dict):
+                    continue
+                
+                # Check if all match_fields are present with correct values
+                if all(element.get(field) == value for field, value in match_fields.items()):
+                    field_str = ", ".join(f'"{k}": {v}' for k, v in match_fields.items())
+                    return CheckResult(True, f"Found element with {{{field_str}}}")
+            
+            # No match found
+            field_str = ", ".join(f'"{k}": {v}' for k, v in match_fields.items())
+            return CheckResult(False, f"No element found with {{{field_str}}}")
+        except FileNotFoundError:
+            return CheckResult(False, f"File not found: {filepath}")
+        except json.JSONDecodeError as e:
+            return CheckResult(False, f"Invalid JSON in {filepath}: {e}")
+        except Exception as e:
+            return CheckResult(False, f"Error reading {filepath}: {e}")
     return _check
