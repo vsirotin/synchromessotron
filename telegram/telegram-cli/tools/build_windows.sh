@@ -16,23 +16,33 @@ LIB_DIR="$(cd "$PROJECT_DIR/../telegram-lib" && pwd)"
 
 cd "$PROJECT_DIR"
 
+# Create an isolated build venv so we never touch the global Python.
+BUILD_VENV="$PROJECT_DIR/dist/.build-venv"
+if [[ ! -f "$BUILD_VENV/bin/python" ]]; then
+    echo "==> Creating build venv at dist/.build-venv ..."
+    python3 -m venv "$BUILD_VENV"
+fi
+PY="$BUILD_VENV/bin/python"
+PIP="$BUILD_VENV/bin/pip"
+PYINSTALLER="$BUILD_VENV/bin/pyinstaller"
+
 echo "==> Installing PyInstaller, build, and wheel..."
-pip install --quiet pyinstaller build wheel
+"$PIP" install --quiet pyinstaller build wheel
 
 echo "==> Building telegram-lib wheel..."
 mkdir -p dist/wheels
 cd "$LIB_DIR"
-python -m build --wheel --outdir "$PROJECT_DIR/dist/wheels" .
+"$PY" -m build --wheel --outdir "$PROJECT_DIR/dist/wheels" .
 cd "$PROJECT_DIR"
 
 echo "==> Installing telegram-lib from wheel..."
-pip install --quiet --no-index --find-links dist/wheels telegram-lib
+"$PIP" install --quiet --find-links dist/wheels telegram-lib
 
 echo "==> Installing telegram-cli..."
-pip install --quiet .
+"$PIP" install --quiet .
 
 echo "==> Building telegram-cli.exe..."
-pyinstaller ./telegram-cli.spec
+"$PYINSTALLER" ./telegram-cli.spec
 
 echo "==> Done: dist/telegram-cli.exe"
 echo "    Smoke test:  dist\\telegram-cli.exe version"

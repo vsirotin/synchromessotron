@@ -1,11 +1,20 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
+from pathlib import Path
+
+# Use os.getcwd() since __file__ may not be defined in spec context
+PROJECT_DIR = Path(os.getcwd())
+LIB_DIR = PROJECT_DIR.parent / 'telegram-lib'
 
 a = Analysis(
     ['src/__main__.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[
+        (str(PROJECT_DIR / 'src' / 'version.yaml'), 'src'),
+        (str(LIB_DIR / 'telegram_lib' / 'version.yaml'), 'telegram_lib'),
+    ],
     hiddenimports=['telegram_lib'],
     hookspath=[],
     hooksconfig={},

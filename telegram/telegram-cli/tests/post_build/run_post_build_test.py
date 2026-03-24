@@ -59,20 +59,21 @@ class PostBuildTestRunner:
         else:
             return "linux"
     
-    def get_all_cli_executables(self) -> list[tuple[str, str]]:
+    def get_all_cli_executables(self) -> tuple[list[tuple[str, str]], bool]:
         """
         Get all available CLI executables in current directory.
         
         Returns:
-            List of tuples (name, command) for each available executable.
-            name: descriptive name (e.g., "Python archive", "macOS native")
-            command: executable command (e.g., "python3 telegram-cli.pyz", etc.)
+            Tuple of (executables_list, has_platform_binary)
+            - executables_list: List of tuples (name, command) for each available executable
+            - has_platform_binary: True if platform-specific binary exists (.exe, .bin, or .pyz on Linux)
         
         Raises:
-            FileNotFoundError: If no executables found
+            FileNotFoundError: If no executables found at all
         """
         platform_name = self.get_platform_name()
         executables = []
+        has_platform_binary = False
         
         # Check for .pyz (portable, works on all platforms)
         if Path("telegram-cli.pyz").exists():
@@ -82,24 +83,72 @@ class PostBuildTestRunner:
         if platform_name == "macos":
             if Path("telegram-cli").exists():
                 executables.append(("macOS native binary", str(Path("telegram-cli").resolve())))
+                has_platform_binary = True
         
         elif platform_name == "windows":
             if Path("telegram-cli.exe").exists():
                 executables.append(("Windows executable (.exe)", str(Path("telegram-cli.exe").resolve())))
+                has_platform_binary = True
         
-        # No executables found
+        elif platform_name == "linux":
+            if Path("telegram-cli").exists():
+                executables.append(("Linux binary", str(Path("telegram-cli").resolve())))
+                has_platform_binary = True
+        
+        # No executables found at all
         if not executables:
             raise FileNotFoundError(
                 f"No CLI executables found in {Path.cwd()}\n"
-                f"Expected: telegram-cli.pyz, telegram-cli (macOS), or telegram-cli.exe (Windows)"
+                f"Expected: telegram-cli.pyz, telegram-cli (macOS/Linux), or telegram-cli.exe (Windows)"
             )
         
-        return executables
+        return executables, has_platform_binary
     
+    def rebuild_platform_binary(self) -> bool:
+        """
+        Rebuild the platform-specific executable for this machine.
+        
+        Returns:
+            True if rebuild succeeded, False otherwise
+        """
+        platform_name = self.get_platform_name()
+        
+        if platform_name == "macos":
+            build_script = "tools/build_macos.sh"
+        elif platform_name == "windows":
+            build_script = "tools/build_windows.sh"
+        else:
+            print(f"⚠ Linux platform builds not yet supported")
+            return False
+        
+        print(f"\n{'='*60}")
+        print(f"Rebuilding {platform_name} binary...")
+        print(f"{'='*60}\n")
+        
+        try:
+            result = subprocess.run(
+                f"bash {build_script}",
+                cwd=str(self.dist_dir.parent),  # Run from telegram-cli root
+                capture_output=True,
+                text=True,
+                timeout=300,
+                shell=True
+            )
+            
+            if result.returncode == 0:
+                print(f"✓ {platform_name} binary rebuilt successfully")
+                return True
+            else:
+                print(f"✗ Build failed:")
+                print(result.stderr if result.stderr else result.stdout)
+                return False
+        except subprocess.TimeoutExpired:
+            print(f"✗ Build timed out (300s)")
+            return False
+        except Exception as e:
+            print(f"✗ Build error: {e}")
+            return False
     
-    def check_config_exists(self) -> bool:
-        """Check if config.yaml exists in current directory."""
-        return Path("config.yaml").exists()
     
     def run_tests(self, cli: str, project_root: Path) -> tuple[int, int, int]:
         """
@@ -173,14 +222,31 @@ def main():
         print(f"{'='*60}")
         print("Post-Build Verification Test Runner")
         print(f"{'='*60}")
-        print(f"Platform: {runner.get_platform_name()}")
+        platform_name = runner.get_platform_name()
+        print(f"Platform: {platform_name}")
         print(f"Working directory: {Path.cwd()}")
         
         # Get all available CLI executables
         print(f"\nLooking for built executables...")
-        executables = runner.get_all_cli_executables()
+        executables, has_platform_binary = runner.get_all_cli_executables()
         for name, cli in executables:
             print(f"  Found: {name}")
+        
+        # Check if development platform binary exists
+        if not has_platform_binary:
+            print(f"\n⚠ Warning: No {platform_name} native binary found!")
+            print(f"  Attempting to rebuild...")
+            
+            if runner.rebuild_platform_binary():
+                # Re-scan for executables after rebuild
+                print(f"\n  Re-scanning for executables...")
+                executables, has_platform_binary = runner.get_all_cli_executables()
+                print(f"  Found: {len(executables)} executable(s)")
+                for name, cli in executables:
+                    print(f"    - {name}")
+            else:
+                print(f"  Build failed. Cannot continue without platform binary.")
+                sys.exit(1)
         
         # Run version check for each executable
         total_tests_all = 0

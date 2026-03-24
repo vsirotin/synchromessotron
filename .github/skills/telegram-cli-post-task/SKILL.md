@@ -50,7 +50,7 @@ Execute `telegram/telegram-cli/tests/post_build/run_post_build_test.py` to verif
 
 ---
 
-### 3. Collect and Report Results
+### 3. Collect and Report Results (BLOCKING GATE)
 
 Summarize both unit tests and post-build verification results.
 
@@ -68,7 +68,11 @@ Ready for post-task (version bump, release notes)?  YES/NO
 ============================================================
 ```
 
-**Proceed to post-task skill?** YES (always, regardless of test failures)
+**Decision Gate (BLOCKING):**
+- **YES, proceed to post-task skill** — Only if **BOTH** unit tests AND post-build verification PASSED
+- **NO, STOP here** — If **ANY** failures detected in either tests or verification. Do NOT allow workspace post-task skill to run. Errors must be resolved first.
+
+**Rationale:** Best practice — all tests must pass before committing version changes and release notes. Failures indicate broken code that should not be released.
 
 ---
 
@@ -76,5 +80,6 @@ Ready for post-task (version bump, release notes)?  YES/NO
 
 - This skill targets changes **within** `telegram/telegram-cli/` (code, tests, configs)
 - Does **not** run for documentation-only changes (README.md, DEVELOPMENT.md, etc.)
-- Failures in unit tests or post-build verification do **not** block the workspace post-task skill
-- The workflow ensures testing happens before version management, maintaining traceability in release notes
+- **Failures BLOCK the workspace post-task skill** — This ensures no version bumps or release notes are created when tests fail
+- The workflow guarantees code quality: testing → verification → version management
+- Developer must fix all errors before attempting to commit changes

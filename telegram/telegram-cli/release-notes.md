@@ -1,5 +1,11 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.20
+Enhanced post-build verification and created telegram-cli-post-task skill: (1) Refactored `run_post_build_test.py` to distinguish between CI/CD (any executable OK) and developer machine (platform binary required); (2) Added `get_all_cli_executables()` return value to track whether platform-specific binary exists; (3) Implemented `rebuild_platform_binary()` method that automatically rebuilds missing developer platform executable (macOS/Windows) via corresponding build script; (4) Main test runner now attempts auto-rebuild when platform binary missing, supporting rapid local development iteration; (5) Created `telegram-cli-post-task` skill with `.instructions.md` activation file for pre-release verification (unit tests + post-build checks) before workspace post-task; (6) Skill runs automatically when changes affect `telegram/telegram-cli/` code or tests, collecting results and proceeding regardless of test status.
+
+## Version: 1.0.19
+Fixed PyInstaller data files bundling: (1) Added `datas` parameter to `telegram-cli.spec` to explicitly include version.yaml files from both `src` and `telegram_lib` packages; (2) Previous fix only added `telegram_lib` to `hiddenimports`, which includes Python modules but NOT data files; (3) Used `Path(__file__).parent` and relative paths to dynamically construct paths to version.yaml files; (4) PyInstaller now correctly bundles version.yaml files into the macOS and Windows executables at runtime. Version output now returns correct semantic version (e.g., 1.0.19) instead of "unknown".
+
 ## Version: 1.0.18
 Fixed PyInstaller spec file path in build scripts: Changed relative path from `../telegram-cli.spec` to `./telegram-cli.spec` in both `build_macos.sh` and `build_windows.sh`. The incorrect path caused build failures with "Spec file not found" when scripts ran from the project root directory. This was not caught locally because build scripts were not executed during development.
 
