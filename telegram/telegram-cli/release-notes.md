@@ -1,5 +1,9 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.22
+
+Fixed Windows build script venv path issues: (1) Windows venv creates `Scripts/python.exe` (not `bin/python`) and `Scripts/pip`; bash script was hardcoding Unix paths; (2) Added platform detection to both Windows and macOS build scripts: check if `BUILD_VENV/Scripts/` exists to determine Windows vs Unix; (3) Set `PY` variable to correct path based on detection; (4) Changed PyInstaller invocation from `$PYINSTALLER` variable to `$PY -m PyInstaller` which is more portable; (5) Changed venv check from `[[ ! -f "$BUILD_VENV/bin/python" ]]` to `[[ ! -d "$BUILD_VENV" ]]` (simpler and platform-agnostic); (6) GitHub Actions Windows runner with bash now correctly finds Python in venv.
+
 ## Version: 1.0.21
 Fixed CI/CD pipeline builds for GitHub Actions: (1) Fixed Windows build script using non-existent `.build-venv/bin/pip` path on Windows; changed to `$PY -m pip` which works on all platforms (Windows, macOS, Linux); (2) Added CI/CD mode detection to post-build verification: detect `CI` or `GITHUB_ACTIONS` environment variables; (3) In CI/CD mode, allow `.pyz` (cross-platform) to pass without requiring platform-specific binary; in developer mode, require platform binary to catch environment issues early; (4) Updated build scripts (Windows, macOS) to use `$PY -m pip` consistently instead of separate `$PIP` variable; (5) Fixed venv path issues in WSL/bash by using Python module invocation rather than direct pip executable lookup. All three GitHub Actions jobs (.pyz on Linux, .exe on Windows, native binary on macOS) now succeed.
 

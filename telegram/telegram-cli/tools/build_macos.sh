@@ -17,12 +17,19 @@ cd "$PROJECT_DIR"
 
 # Create an isolated build venv so we never touch the global Python.
 BUILD_VENV="$PROJECT_DIR/dist/.build-venv"
-if [[ ! -f "$BUILD_VENV/bin/python" ]]; then
+if [[ ! -d "$BUILD_VENV" ]]; then
     echo "==> Creating build venv at dist/.build-venv ..."
     python3 -m venv "$BUILD_VENV"
 fi
-PY="$BUILD_VENV/bin/python"
-PYINSTALLER="$BUILD_VENV/bin/pyinstaller"
+
+# Detect Windows vs Unix venv structure
+if [[ -d "$BUILD_VENV/Scripts" ]]; then
+    # Windows
+    PY="$BUILD_VENV/Scripts/python.exe"
+else
+    # Unix/Linux/macOS
+    PY="$BUILD_VENV/bin/python"
+fi
 
 echo "==> Installing PyInstaller, build, and wheel..."
 "$PY" -m pip install --quiet pyinstaller build wheel
@@ -40,7 +47,7 @@ echo "==> Installing telegram-cli..."
 "$PY" -m pip install --quiet .
 
 echo "==> Building telegram-cli binary..."
-"$PYINSTALLER" ./telegram-cli.spec
+"$PY" -m PyInstaller ./telegram-cli.spec
 
 echo "==> Packaging as zip..."
 cd dist
