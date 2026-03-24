@@ -183,3 +183,38 @@ def check_json_contains_element(
         except Exception as e:
             return CheckResult(False, f"Error reading {filepath}: {e}")
     return _check
+
+
+def check_directory_exists(dirpath: str) -> Callable[[], CheckResult]:
+    """
+    Verify a directory exists at the specified path.
+    
+    Args:
+        dirpath: Path to the directory to check
+    
+    Returns:
+        A function that returns CheckResult
+    """
+    def _check() -> CheckResult:
+        if not os.path.isdir(dirpath):
+            return CheckResult(False, f"Directory not found: {dirpath}")
+        return CheckResult(True, f"Directory exists: {dirpath}")
+    return _check
+
+
+def check_file_exists(filepath: str) -> Callable[[], CheckResult]:
+    """
+    Verify a file exists at the specified path.
+    
+    Args:
+        filepath: Path to the file to check
+    
+    Returns:
+        A function that returns CheckResult
+    """
+    def _check() -> CheckResult:
+        if not os.path.isfile(filepath):
+            return CheckResult(False, f"File not found: {filepath}")
+        return CheckResult(True, f"File exists: {filepath}")
+    return _check
+

@@ -22,6 +22,7 @@ from pathlib import Path
 from src.config import load_config
 from src._lib import create_client, count_messages, read_messages
 from src.errors import format_error_and_exit
+from telegram_lib import get_dialogs
 
 logger = logging.getLogger("telegram_cli")
 
@@ -100,7 +101,7 @@ def _is_tty() -> bool:
     return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
 
-def _progress_start(dialog_id, limit, since, output):
+def _progress_start(dialog_id, dialog_name, limit, since, output):
     """Stage 1 — print start info."""
     parts = [f"Backup: dialog={dialog_id}, limit={limit}"]
     if since:
@@ -220,6 +221,39 @@ async def _async_estimate(client, dialog_id, since):
 # ---------------------------------------------------------------------------
 
 
+async def _async_get_dialog_name(client, dialog_id: int) -> str:
+    """Fetch dialog name from Telegram API, return dialog_id as fallback."""
+    try:
+        result = await get_dialogs(client, limit=500)
+        if result.ok:
+            for dialog in result.payload:
+                if dialog.id == dialog_id:
+                    # Clean up dialog name for folder naming (remove special chars)
+                    name = dialog.name.replace("/", "_").replace("\\", "_")
+                    return name if name else str(dialog_id)
+    except Exception as e:
+        logger.warning(f"Failed to fetch dialog name: {e}")
+    # Fallback: use dialog_id as name
+    return str(dialog_id)
+
+
+def _generate_messages_md(messages: list[dict]) -> str:
+    """Generate markdown representation of messages."""
+    if not messages:
+        return "# Messages\n\nNo messages.\n"
+    
+    lines = ["# Messages\n"]
+    for msg in messages:
+        sender = msg.get("sender_name") or f"User {msg.get('sender_id')}"
+        date = msg.get("date", "")
+        text = msg.get("text", "(no text)")
+        lines.append(f"## {sender} ({date})")
+        lines.append(text)
+        lines.append("")
+    
+    return "\n".join(lines)
+
+
 def run_backup(
     *,
     dialog_id: int,
@@ -246,26 +280,20 @@ def run_backup(
     client = create_client(config["api_id"], config["api_hash"], config["session"])
     
     # Determine output directory: use outdir if provided, otherwise default
-    output_dir = Path(outdir) if outdir else Path("./synchromessotron")
-    output_file = output_dir / "messages.json"
-
-    # T11 — check output dir write permission
-    _check_output_writable(output_file)
-
-    # T22 — scan existing
-    existing_ids: set[int] = _scan_existing(output_file)
-    latest_local: datetime | None = _latest_timestamp(output_file)
-
+    base_output_dir = Path(outdir) if outdir else Path("./synchromessotron")
+    
+    # Fetch dialog name and determine output file path
+    # This will happen in _async_backup where we're in the proper async context
     result = asyncio.run(
-        _async_backup(client, dialog_id, since_dt, limit, existing_ids, latest_local, output_file)
+        _async_backup(client, dialog_id, since_dt, limit, base_output_dir)
     )
-
-    if isinstance(result, tuple):
-        messages, pauses, elapsed = result
-    else:
-        # result is a TgResult error
+    
+    if not isinstance(result, tuple):
+        # result is a TgResult with error
         format_error_and_exit(result.error)
-        return  # unreachable but satisfies type checker
+        return
+    
+    messages, pauses, elapsed, output_file = result
 
     # Serialize
     data = [_message_to_dict(m) for m in messages]
@@ -274,14 +302,34 @@ def run_backup(
     existing_data = _load_existing_data(output_file)
     merged = _merge_messages(existing_data, data)
     _atomic_write_json(output_file, merged)
+    
+    # Generate messages.md file
+    md_content = _generate_messages_md(merged)
+    messages_md_path = output_file.parent / "messages.md"
+    messages_md_path.write_text(md_content, encoding="utf-8")
+    
     _progress_done(len(data), elapsed, output_file, pauses)
 
 
 async def _async_backup(
-    client, dialog_id, since_dt, limit, existing_ids, latest_local, output_file,
+    client, dialog_id, since_dt, limit, base_output_dir,
 ):
-    """Connect, paginate, disconnect. Returns (messages, pauses, elapsed) or TgResult on error."""
+    """Connect, fetch dialog info, paginate, disconnect. 
+    Returns (messages, pauses, elapsed, output_file) or TgResult on error."""
     async with client:
+        # Fetch dialog name first
+        dialog_name = await _async_get_dialog_name(client, dialog_id)
+        dialog_dir_name = f"{dialog_name}_{dialog_id}"
+        output_dir = base_output_dir / dialog_dir_name
+        output_file = output_dir / "messages.json"
+        
+        # T11 — check output dir write permission
+        _check_output_writable(output_file)
+        
+        # T22 — scan existing
+        existing_ids: set[int] = _scan_existing(output_file)
+        latest_local: datetime | None = _latest_timestamp(output_file)
+        
         # Determine total for progress
         count_result = await count_messages(client, dialog_id, since=since_dt)
         if not count_result.ok:
@@ -293,7 +341,7 @@ async def _async_backup(
         pages = math.ceil(new_to_fetch / PAGE_SIZE) if new_to_fetch else 0
 
         # T23 — progress stages 1-3
-        _progress_start(dialog_id, limit, since_dt, output_file)
+        _progress_start(dialog_id, dialog_name, limit, since_dt, output_file)
         _progress_local_scan(len(existing_ids), latest_local, new_to_fetch)
         _progress_estimate(new_to_fetch, pages)
 
@@ -343,7 +391,7 @@ async def _async_backup(
             _progress_bar(page_num, pages, fetched_count, new_to_fetch, elapsed, tty)
 
         elapsed = time.monotonic() - start_time
-        return (all_messages, pauses, elapsed)
+        return (all_messages, pauses, elapsed, output_file)
 
 
 # ---------------------------------------------------------------------------

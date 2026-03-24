@@ -1,5 +1,9 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.23
+
+Fixed backup command directory structure and file generation per F1 requirements: (1) Created hierarchical directory structure `<dialog_name>_<dialog_id>/` instead of flat structure for message backups; (2) Fetch dialog name asynchronously from Telegram API using `get_dialogs()` to create user-readable directory names; (3) Added `messages.md` markdown file generation alongside `messages.json` for human-readable message backup; (4) Updated `_progress_start()` to include dialog name in progress output; (5) Refactored `_async_backup()` to handle dialog info fetching within async context before pagination; (6) All 10 integration tests now pass (26/26 checks): Tests 1-8 validate command functionality, Tests 9-10 validate F1-compliant directory structure and file generation.
+
 ## Version: 1.0.22
 
 Fixed Windows build script venv path issues: (1) Windows venv creates `Scripts/python.exe` (not `bin/python`) and `Scripts/pip`; bash script was hardcoding Unix paths; (2) Added platform detection to both Windows and macOS build scripts: check if `BUILD_VENV/Scripts/` exists to determine Windows vs Unix; (3) Set `PY` variable to correct path based on detection; (4) Changed PyInstaller invocation from `$PYINSTALLER` variable to `$PY -m PyInstaller` which is more portable; (5) Changed venv check from `[[ ! -f "$BUILD_VENV/bin/python" ]]` to `[[ ! -d "$BUILD_VENV" ]]` (simpler and platform-agnostic); (6) GitHub Actions Windows runner with bash now correctly finds Python in venv.

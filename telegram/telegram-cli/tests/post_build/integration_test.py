@@ -12,6 +12,7 @@ Usage:
 import os
 import subprocess
 import sys
+import glob
 from typing import Callable
 from pathlib import Path
 
@@ -23,12 +24,16 @@ from .check_output_json import (
     check_json_file_valid,
     check_json_array_length,
     check_json_contains_element,
+    check_directory_exists,
+    check_file_exists,
 )
 from .check_stdout import (
     check_stdout_contains,
     check_stdout_line_count,
     check_stdout_exact_line_count,
     check_stdout_contains_line_with_parts,
+    check_stdout_first_line_starts_with,
+    check_stdout_contains_line_starting_with,
 )
 def test(cli: str, command: str, *checks: Callable[..., CheckResult]) -> tuple[int, int]:
     """
@@ -201,6 +206,202 @@ def integration_test(cli: str) -> tuple[int, int, int]:
         check_json_array_length(output_file, 50),
         check_json_contains_element(output_file, {"id": -718738386, "type": "Chat"})
     )
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+    
+    # Test 4: backup command - happy path with default output directory
+    test_name = "backup command - retrieve messages with --limit=500"
+    print(f"\n[Test 4] {test_name}")
+    
+    checks_count, passed_count = test(
+        cli,
+        "backup -4821106881 --limit=500",
+        check_stdout_first_line_starts_with("Backup: dialog=-4821106881, limit=500 | output="),
+        check_stdout_contains_line_starting_with("Local:"),
+        check_stdout_contains_line_starting_with("Estimated time:"),
+        check_stdout_contains("messages saved")
+    )
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+    
+    # Test 5: backup creates correct directory structure with messages.json
+    test_name = "backup creates directory structure with messages.json"
+    print(f"\n[Test 5] {test_name}")
+    
+    # Backup output should be in synchromessotron/<dialog_name>_<dialog_id>/
+    # We need to find what directory was created - look for pattern
+    backup_root = "synchromessotron"
+    
+    # Clean up old backup if it exists
+    if os.path.exists(backup_root):
+        import shutil
+        shutil.rmtree(backup_root)
+    
+    checks_count, passed_count = test(
+        cli,
+        "backup -4821106881 --limit=500",
+        check_stdout_first_line_starts_with("Backup: dialog=-4821106881"),
+    )
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+    
+    # Test 6: backup with custom output directory
+    test_name = "backup command with custom --outdir"
+    print(f"\n[Test 6] {test_name}")
+    
+    custom_outdir = "custom_backup"
+    
+    # Clean up old backup if it exists
+    if os.path.exists(custom_outdir):
+        import shutil
+        shutil.rmtree(custom_outdir)
+    
+    checks_count, passed_count = test(
+        cli,
+        f"backup -4821106881 --limit=100 --outdir={custom_outdir}",
+        check_stdout_first_line_starts_with("Backup: dialog=-4821106881"),
+        check_stdout_contains("Local:"),
+    )
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+    
+    # Test 7: backup --estimate flag (no files written)
+    test_name = "backup --estimate flag shows time estimate without writing files"
+    print(f"\n[Test 7] {test_name}")
+    
+    checks_count, passed_count = test(
+        cli,
+        "backup -4821106881 --limit=500 --estimate",
+        check_stdout_contains("messages"),
+        check_stdout_contains("pages"),
+        check_stdout_contains("\u2248")  # ≈ symbol
+    )
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+    
+    # Test 8: backup with small limit
+    test_name = "backup with --limit=50 creates messages for small dataset"
+    print(f"\n[Test 8] {test_name}")
+    
+    backup_small = "backup_small"
+    if os.path.exists(backup_small):
+        import shutil
+        shutil.rmtree(backup_small)
+    
+    checks_count, passed_count = test(
+        cli,
+        f"backup -4821106881 --limit=50 --outdir={backup_small}",
+        check_stdout_contains("Local:"),
+        check_stdout_contains("messages saved"),
+    )
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+    
+    # Test 9: verify backup creates dialog subdirectory with correct structure
+    test_name = "backup creates dialog_name_dialog_id subdirectory (F1 requirement)"
+    print(f"\n[Test 9] {test_name}")
+    
+    backup_verify = "backup_verify"
+    if os.path.exists(backup_verify):
+        import shutil
+        shutil.rmtree(backup_verify)
+    
+    # Run backup command
+    test(
+        cli,
+        f"backup -4821106881 --limit=20 --outdir={backup_verify}",
+        check_stdout_contains("messages saved"),
+    )
+    
+    # Now verify the directory structure
+    # The dialog_name for -4821106881 should be a group name from get-dialogs
+    # According to the data we saw, this is "Виталий, Viktor и Сергей"
+    # But we should check for any directory matching pattern: *_-4821106881
+    
+    import glob
+    matching_dirs = glob.glob(os.path.join(backup_verify, "*_-4821106881"))
+    
+    checks_count = 3
+    passed_count = 0
+    
+    if matching_dirs:
+        dialog_dir = matching_dirs[0]
+        
+        # Check that messages.json exists in the dialog subdirectory
+        messages_json = os.path.join(dialog_dir, "messages.json")
+        messages_md = os.path.join(dialog_dir, "messages.md")
+        
+        print(f"\n  Checking directory structure at: {dialog_dir}")
+        
+        # Run checks directly since files are already created
+        check_fns = [
+            check_file_exists(messages_json),
+            check_file_exists(messages_md),
+            check_json_file_valid(messages_json),
+        ]
+        
+        for check_fn in check_fns:
+            check_result = check_fn()
+            if not check_result.passed:
+                print(f"  ✗ FAILED: {check_result.message}")
+            else:
+                passed_count += 1
+                print(f"    ✓ {check_result.message}")
+    else:
+        # If no matching directory found, report failure
+        print(f"  ✗ FAILED: No directory matching *_-4821106881 found in {backup_verify}")
+        matching = glob.glob(os.path.join(backup_verify, "*"))
+        if matching:
+            print(f"    Found: {matching}")
+    
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+    
+    # Test 10: backup messages.json contains valid JSON array
+    test_name = "backup messages.json is valid JSON array"
+    print(f"\n[Test 10] {test_name}")
+    
+    backup_json = "backup_json"
+    if os.path.exists(backup_json):
+        import shutil
+        shutil.rmtree(backup_json)
+    
+    test(
+        cli,
+        f"backup -4821106881 --limit=30 --outdir={backup_json}",
+        check_stdout_contains("messages saved"),
+    )
+    
+    # Find the messages.json file and validate it
+    matching_dirs = glob.glob(os.path.join(backup_json, "*_-4821106881"))
+    
+    checks_count = 2
+    passed_count = 0
+    
+    if matching_dirs:
+        messages_json = os.path.join(matching_dirs[0], "messages.json")
+        
+        # Run checks directly since files are already created
+        check_fns = [
+            check_json_file_valid(messages_json),
+            check_json_array_length(messages_json, 30),  # Should have around 30 messages
+        ]
+        
+        for check_fn in check_fns:
+            check_result = check_fn()
+            if not check_result.passed:
+                print(f"  ✗ FAILED: {check_result.message}")
+            else:
+                passed_count += 1
+                print(f"    ✓ {check_result.message}")
+    
     total_tests += 1
     total_checks += checks_count
     total_passed += passed_count

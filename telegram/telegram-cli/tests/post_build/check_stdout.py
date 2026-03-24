@@ -57,3 +57,28 @@ def check_stdout_contains_line_with_parts(*parts: str) -> Callable[[str], CheckR
         parts_str = ", ".join([f"'{p}'" for p in parts])
         return CheckResult(False, f"No line found containing all parts: {parts_str}")
     return _check
+
+
+def check_stdout_first_line_starts_with(prefix: str) -> Callable[[str], CheckResult]:
+    """Verify the first non-empty line starts with the given prefix."""
+    def _check(output: str) -> CheckResult:
+        lines = [line for line in output.split("\n") if line.strip()]
+        if not lines:
+            return CheckResult(False, "No output found")
+        first_line = lines[0]
+        if first_line.startswith(prefix):
+            return CheckResult(True, f"First line starts with '{prefix}'")
+        return CheckResult(False, f"First line doesn't start with '{prefix}'. Got: {first_line[:50]}...")
+    return _check
+
+
+def check_stdout_contains_line_starting_with(prefix: str) -> Callable[[str], CheckResult]:
+    """Verify output contains a line that starts with the given prefix."""
+    def _check(output: str) -> CheckResult:
+        lines = [line for line in output.split("\n") if line.strip()]
+        for line in lines:
+            if line.startswith(prefix):
+                return CheckResult(True, f"Found line starting with '{prefix}'")
+        return CheckResult(False, f"No line found starting with '{prefix}'")
+    return _check
+
