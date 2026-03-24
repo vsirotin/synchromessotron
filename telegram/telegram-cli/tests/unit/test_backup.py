@@ -59,6 +59,15 @@ class _FakeMessageInfo:
         self.has_media = has_media
 
 
+class _FakeDialogInfo:
+    def __init__(self, id, name, type="Chat", username=None, unread_count=0):
+        self.id = id
+        self.name = name
+        self.type = type
+        self.username = username
+        self.unread_count = unread_count
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -160,13 +169,17 @@ class TestBackupToFile:
         count_result = _FakeResult(payload=2)
         page_result = _FakeResult(payload=msgs)
         output_dir = tmp_path / "backup"
-        output_file = output_dir / "messages.json"
+        
+        # Dialog will be created at output_dir / "Test Dialog_100" / "messages.json"
+        dialog_info = _FakeDialogInfo(id=100, name="Test Dialog")
+        dialogs_result = _FakeResult(payload=[dialog_info])
 
         with (
             patch("src.commands.backup.load_config", return_value={
                 "api_id": 1, "api_hash": "a", "session": "s"
             }),
             patch("src.commands.backup.create_client") as mock_cc,
+            patch("src.commands.backup.get_dialogs", new_callable=AsyncMock, return_value=dialogs_result),
             patch("src.commands.backup.count_messages", new_callable=AsyncMock, return_value=count_result),
             patch("src.commands.backup.read_messages", new_callable=AsyncMock, return_value=page_result),
             patch("src.commands.backup._is_tty", return_value=False),
@@ -176,6 +189,8 @@ class TestBackupToFile:
             from src.commands.backup import run_backup
             run_backup(dialog_id=100, limit=100, outdir=str(output_dir))
 
+        # File is now in subdirectory <dialog_name>_<dialog_id>
+        output_file = output_dir / "Test Dialog_100" / "messages.json"
         assert output_file.exists()
         data = json.loads(output_file.read_text())
         assert len(data) == 2
@@ -186,12 +201,17 @@ class TestBackupToFile:
         count_result = _FakeResult(payload=10)
         err = _FakeError("ENTITY_NOT_FOUND", "No such dialog")
         page_result = _FakeResult(error=err)
+        
+        # Mock dialog info
+        dialog_info = _FakeDialogInfo(id=999, name="Test Dialog")
+        dialogs_result = _FakeResult(payload=[dialog_info])
 
         with (
             patch("src.commands.backup.load_config", return_value={
                 "api_id": 1, "api_hash": "a", "session": "s"
             }),
             patch("src.commands.backup.create_client") as mock_cc,
+            patch("src.commands.backup.get_dialogs", new_callable=AsyncMock, return_value=dialogs_result),
             patch("src.commands.backup.count_messages", new_callable=AsyncMock, return_value=count_result),
             patch("src.commands.backup.read_messages", new_callable=AsyncMock, return_value=page_result),
             patch("src.commands.backup._is_tty", return_value=False),
@@ -246,9 +266,11 @@ class TestResumable:
     def test_resumable_skips_existing(self, tmp_path, capsys):
         """Backup with existing output skips already-downloaded messages."""
         # Create output directory with existing messages file
+        # With new structure: backup/<dialog_name>_<dialog_id>/messages.json
         output_dir = tmp_path / "backup"
-        output_dir.mkdir()
-        output_file = output_dir / "messages.json"
+        dialog_subdir = output_dir / "Test Dialog_100"
+        dialog_subdir.mkdir(parents=True)
+        output_file = dialog_subdir / "messages.json"
         output_file.write_text(json.dumps([
             {"id": 1, "dialog_id": 100, "text": "Old", "date": "2026-06-01T12:00:00+00:00",
              "sender_id": None, "sender_name": None, "has_media": False},
@@ -259,12 +281,17 @@ class TestResumable:
         msg2 = _make_msg(2, "New", 1)
         count_result = _FakeResult(payload=2)
         page_result = _FakeResult(payload=[msg1, msg2])
+        
+        # Mock dialog info
+        dialog_info = _FakeDialogInfo(id=100, name="Test Dialog")
+        dialogs_result = _FakeResult(payload=[dialog_info])
 
         with (
             patch("src.commands.backup.load_config", return_value={
                 "api_id": 1, "api_hash": "a", "session": "s"
             }),
             patch("src.commands.backup.create_client") as mock_cc,
+            patch("src.commands.backup.get_dialogs", new_callable=AsyncMock, return_value=dialogs_result),
             patch("src.commands.backup.count_messages", new_callable=AsyncMock, return_value=count_result),
             patch("src.commands.backup.read_messages", new_callable=AsyncMock, return_value=page_result),
             patch("src.commands.backup._is_tty", return_value=False),
@@ -295,6 +322,10 @@ class TestRateLimit:
         rate_err = _FakeError("RATE_LIMITED", "Flood", retry_after=1)
         rate_result = _FakeResult(error=rate_err)
         ok_result = _FakeResult(payload=msgs)
+        
+        # Mock dialog info
+        dialog_info = _FakeDialogInfo(id=100, name="Test Dialog")
+        dialogs_result = _FakeResult(payload=[dialog_info])
 
         # First call returns rate limit, second succeeds
         call_count = 0
@@ -310,6 +341,7 @@ class TestRateLimit:
                 "api_id": 1, "api_hash": "a", "session": "s"
             }),
             patch("src.commands.backup.create_client") as mock_cc,
+            patch("src.commands.backup.get_dialogs", new_callable=AsyncMock, return_value=dialogs_result),
             patch("src.commands.backup.count_messages", new_callable=AsyncMock, return_value=count_result),
             patch("src.commands.backup.read_messages", side_effect=mock_read),
             patch("src.commands.backup._is_tty", return_value=False),

@@ -1,5 +1,9 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.24
+
+Fixed unit tests for backup command directory structure changes: (1) Added `_FakeDialogInfo` class to mock DialogInfo for testing; (2) Updated `test_backup_to_file`, `test_backup_error`, `test_resumable_skips_existing`, and `test_rate_limit_retry` to mock `get_dialogs` function calls; (3) Updated test assertions to expect files in new `<dialog_name>_<dialog_id>/` directory structure instead of flat backup directory; (4) All unit tests now pass with the new hierarchical directory structure for message backups.
+
 ## Version: 1.0.23
 
 Fixed backup command directory structure and file generation per F1 requirements: (1) Created hierarchical directory structure `<dialog_name>_<dialog_id>/` instead of flat structure for message backups; (2) Fetch dialog name asynchronously from Telegram API using `get_dialogs()` to create user-readable directory names; (3) Added `messages.md` markdown file generation alongside `messages.json` for human-readable message backup; (4) Updated `_progress_start()` to include dialog name in progress output; (5) Refactored `_async_backup()` to handle dialog info fetching within async context before pagination; (6) All 10 integration tests now pass (26/26 checks): Tests 1-8 validate command functionality, Tests 9-10 validate F1-compliant directory structure and file generation.
