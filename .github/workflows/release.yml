@@ -50,7 +50,7 @@ jobs:
       - name: Build .pyz
         run: bash telegram/telegram-cli/tools/build_pyz.sh
 
-      - name: Post-build integration tests
+      - name: Post-build tests
         run: |
           cd telegram/telegram-cli/dist
           python3 ../tests/post_build/run_post_build_test.py || exit 1
@@ -82,7 +82,7 @@ jobs:
         shell: bash
         run: bash telegram/telegram-cli/tools/build_windows.sh
 
-      - name: Post-build integration tests
+      - name: Post-build tests
         shell: bash
         run: |
           cd telegram/telegram-cli/dist
@@ -114,7 +114,7 @@ jobs:
       - name: Build macOS binary
         run: bash telegram/telegram-cli/tools/build_macos.sh
 
-      - name: Post-build integration tests
+      - name: Post-build tests
         run: |
           cd telegram/telegram-cli/dist
           python3 ../tests/post_build/run_post_build_test.py || exit 1

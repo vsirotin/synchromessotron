@@ -32,7 +32,7 @@ echo "==> Installing telegram-cli..."
 pip install --quiet .
 
 echo "==> Building telegram-cli.exe..."
-pyinstaller --onefile --name telegram-cli src/__main__.py
+pyinstaller ../telegram-cli.spec
 
 echo "==> Done: dist/telegram-cli.exe"
 echo "    Smoke test:  dist\\telegram-cli.exe version"

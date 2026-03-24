@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.17
+Fixed PyInstaller bundling of telegram_lib: (1) Added `'telegram_lib'` to `hiddenimports` in `telegram-cli.spec`; (2) Updated `build_macos.sh` and `build_windows.sh` to use `telegram-cli.spec` instead of command-line PyInstaller invocation; (3) PyInstaller now includes the telegram_lib package when building .exe and macOS binaries, fixing "ModuleNotFoundError: No module named 'telegram_lib'" runtime errors; (4) Version output now works correctly in all distributed formats (.pyz, .exe, .bin). Created `telegram-cli-post-task` skill for pre-release verification (unit tests + post-build checks). Updated `release.yml` workflow labels from "Post-build integration tests" to "Post-build tests".
+
 ## Version: 1.0.16
 Fixed post-build build verification: (1) Refactored `run_post_build_test.py` from attempting to run integration tests to quick build verification via `version` subcommand; (2) Added semantic version pattern regex to validate version output; (3) Now correctly tests each executable (.pyz, .exe, .bin) by running `<executable> version` and checking for valid version output (X.Y.Z format); (4) Full integration tests with config.yaml remain separate in `integration_test.py` and run via `run_integration_tests.py`; (5) Removed unused `integration_test_module` reference and PYTHONPATH configuration; (6) Simplified main() output to focus on executable build verification status rather than parsing test statistics.
 

@@ -31,7 +31,7 @@ echo "==> Installing telegram-cli..."
 pip install --quiet .
 
 echo "==> Building telegram-cli binary..."
-pyinstaller --onefile --name telegram-cli src/__main__.py
+pyinstaller ../telegram-cli.spec
 
 echo "==> Packaging as zip..."
 cd dist
