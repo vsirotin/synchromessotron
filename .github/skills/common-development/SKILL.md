@@ -3,7 +3,7 @@ name: common-development
 description: Common rules for code development that apply across all project types (libraries, CLI tools, services, etc.). Covers requirements clarity, bug-fix workflow, logging, coding style, testing discipline, version management, and commit conventions.
 metadata:
   author: vsirotin
-  version: "1.2"
+  version: "1.3"
 ---
 
 # Common Development Rules
@@ -68,18 +68,22 @@ When a project has many unit tests (more than 5), try to group them into sub-dir
 
 After completing development, all unit tests in the project must be processed with success.
 
-### 10. Stop on unsolvable problems
+### 10. Clean up temporary test artifacts
+
+After running tests, delete any temporary directories or files created during the test run (e.g. output or download directories produced in `dist/` by integration tests). Leave the project tree in the same state it was before the tests ran.
+
+### 11. Stop on unsolvable problems
 
 If you see suddenly that you cannot solve some problem, stop the development and ask me.
 
-### 11. Stop on long bug-fix loops
+### 12. Stop on long bug-fix loops
 
 If you try to fix the same bug too long (more than 20 iterations), stop the development and ask me.
 
-### 12. Test dependent projects
+### 13. Test dependent projects
 
 When a library changes, also run the tests of projects that depend on it. Discover dependents by scanning `pyproject.toml` files in the workspace for the library name in their `dependencies` list.
 
-### 13. Post-task checklist
+### 14. Post-task checklist
 
 After completing a task that makes essential changes, apply the [post-task](../post-task/SKILL.md) skill (version bump, release notes, commit text proposal).

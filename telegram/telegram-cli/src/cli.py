@@ -63,6 +63,9 @@ def build_parser() -> argparse.ArgumentParser:
     bp.add_argument("--gifs", action="store_true", help="Also download GIF animations")
     bp.add_argument("--members", action="store_true", help="Also save dialog participant list")
     bp.add_argument("--estimate", action="store_true", help="Print time estimate and exit")
+    bp.add_argument("--upto", type=str, default=None, help="ISO 8601 upper timestamp bound (inclusive)")
+    bp.add_argument("--count", action="store_true", help="Print message/file counts and exit, no data written")
+    bp.add_argument("--split_threshold", type=int, default=100, help="Time bucket split threshold (default: 100)")
 
     # download-media (F6)
     dm = subparsers.add_parser("download-media", help="Download media from a message")
@@ -115,6 +118,7 @@ def main(argv: list[str] | None = None) -> None:
         run_backup(
             dialog_id=args.dialog_id,
             since=args.since,
+            upto=args.upto,
             limit=args.limit,
             outdir=args.outdir,
             media=args.media,
@@ -125,6 +129,8 @@ def main(argv: list[str] | None = None) -> None:
             gifs=args.gifs,
             members=args.members,
             estimate=args.estimate,
+            count=args.count,
+            split_threshold=args.split_threshold,
         )
     elif args.command == "download-media":
         from src.commands.download_media import run_download_media

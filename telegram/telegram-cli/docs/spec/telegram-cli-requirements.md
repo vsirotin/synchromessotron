@@ -73,7 +73,7 @@ Retrieve messages from a dialog for full or incremental backup. Saves messages t
 **Signature:**
 
 ```
-telegram-cli backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--outdir=DIR] [--media] [--files] [--music] [--voice] [--links] [--gifs] [--members] [--estimate]
+telegram-cli backup <dialog_id> [--since=TIMESTAMP] [--upto=TIMESTAMP] [--limit=N] [--outdir=DIR] [--media] [--files] [--music] [--voice] [--links] [--gifs] [--members] [--estimate] [--count] [--split_threshold=N]
 ```
 
 **Arguments:**
@@ -82,6 +82,7 @@ telegram-cli backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--outdir=DIR] [
 |----------|----------|------|-------------|
 | `dialog_id` | yes | int | Numeric ID of the dialog (use `get-dialogs` to find it). |
 | `--since` | no | ISO 8601 string | If set, only messages strictly after this timestamp are returned (incremental). If omitted, the most recent messages are returned (full). |
+| `--upto` | no | ISO 8601 string | If set, only messages on or before this timestamp are returned. Can be combined with `--since` for a time window. |
 | `--limit` | no | int | Maximum number of messages to return. Default: `100`. |
 | `--outdir` | no | directory path | Root output directory where the backup directory structure is created. Default: `./synchromessotron` (created in current working directory). |
 | `--media` | no | flag | Also download photos and videos. |
@@ -92,6 +93,8 @@ telegram-cli backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--outdir=DIR] [
 | `--gifs` | no | flag | Also download GIF animations. |
 | `--members` | no | flag | Also save dialog participant list. |
 | `--estimate` | no | flag | Instead of running the backup, print an approximate time estimate and exit. Does not write any files; independent of `--outdir`. |
+| `--count` | no | flag | Print counts of messages and files by type, then exit. No data is written. Shows how many items of each category (messages, media, files, music, voice, gifs, links, members) are present for the selected dialog and filters. |
+| `--split_threshold` | no | int | Override the time-based directory split threshold for this run. Default: `100`. Messages per time bucket (year/month/day/hour/minute) above this value cause a deeper subdirectory to be created. |
 
 **Examples:**
 

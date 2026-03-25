@@ -1,6 +1,10 @@
 # Project telegram/telegram-cli. Release notes 
 
-## Version: 1.0.31
+## Version: 1.0.33
+Added integration tests 26-28 covering the three new backup flags: test 26 (`--upto`): verifies that a backup with `--upto=2026-03-19T00:00:00+00:00 --limit=500` produces 480 messages in the tree (fewer than the unfiltered 499); test 27 (`--count`): verifies stdout prints `Messages: 500 total` + per-type breakdown and that no output directory is created; test 28 (`--split_threshold=5`): verifies that 20 messages with threshold=5 produce a `2026/03/` month-level subdirectory and still contain all 20 messages. Also fixed tests 9, 10, and 20 to traverse the new time-hierarchy tree (using `_leaf_json_files` + `_count_tree_messages` helpers) instead of looking for a flat `messages.json` directly in the dialog subdirectory. All 56 integration checks + 135 unit tests pass.
+
+## Version: 1.0.32
+Added `--upto=TIMESTAMP`, `--count`, and `--split_threshold=N` flags to the backup command, plus time-based directory hierarchy for message storage. `--upto` filters out messages with dates after the given ISO 8601 timestamp. `--count` fetches messages, prints a total + per-media-type breakdown, and exits without writing any files. `--split_threshold` controls how deep the year/month/day hierarchy goes (default 100; year level always created). The backup write path changed from a flat `messages.json` to `<year>/messages.json` (and deeper as needed). `_scan_existing` and `_latest_timestamp` replaced by tree-aware variants that skip media-category subdirs. All 135 unit tests pass.
 Added file download progress output to the backup command: before the download loop a header line `Downloading files: N total.` is printed; a live progress bar `[████░░] N% | X/Y files | Ts elapsed | ≈ Ts left` updates after each file (TTY: overwrite with `\r`, non-TTY: new line per file); all 115 cli unit tests + 61 lib unit tests pass.
 
 ## Version: 1.0.30

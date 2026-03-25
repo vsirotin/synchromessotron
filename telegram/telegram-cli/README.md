@@ -176,14 +176,6 @@ You can override it with `--outdir`:
 python3 telegram-cli.pyz backup -1001234567890 --outdir=/path/to/my/data
 ```
 
-or set it permanently in `config.yaml`:
-
-```yaml
-telegram:
-  output_dir: "/path/to/my/data"
-  split_threshold: 50
-```
-
 > **Conflict rule:** If both `--outdir` and `output_dir` in `config.yaml` are set and they point to different paths, the command exits with an error. Remove one of them to resolve the conflict.
 
 ### Write permissions
@@ -364,7 +356,7 @@ Possible errors: `NETWORK_ERROR`, `PERMISSION_DENIED`, `RATE_LIMITED`, `SESSION_
 ### backup — Backup messages
 
 ```
-backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--outdir=DIR] [--media] [--files] [--music] [--voice] [--links] [--gifs] [--members]
+backup <dialog_id> [--since=TIMESTAMP] [--upto=TIMESTAMP] [--limit=N] [--outdir=DIR] [--media] [--files] [--music] [--voice] [--links] [--gifs] [--members] [--estimate] [--count] [--split_threshold=N]
 ```
 
 **Parameters:**
@@ -373,6 +365,7 @@ backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--outdir=DIR] [--media] [--f
 |-----------|---------|-------------|
 | `<dialog_id>` | — | Dialog ID (required). Use `get-dialogs` to find it. |
 | `--since` | — | ISO 8601 timestamp; only messages after it are returned (incremental). |
+| `--upto` | — | ISO 8601 timestamp; only messages on or before it are returned. Combine with `--since` for a time window. |
 | `--limit` | 100 | Maximum number of messages. |
 | `--outdir` | `./synchromessotron` | Root output directory (see [Output Directory](#output-directory)). |
 | `--media` | off | Also download photos and videos. |
@@ -383,6 +376,8 @@ backup <dialog_id> [--since=TIMESTAMP] [--limit=N] [--outdir=DIR] [--media] [--f
 | `--gifs` | off | Also download GIF animations. |
 | `--members` | off | Also save dialog participant list. |
 | `--estimate` | off | Print a time estimate instead of running the backup. No data is written. |
+| `--count` | off | Print counts of messages and files by type, then exit. No data is written. |
+| `--split_threshold` | 100 | Messages per time bucket before a deeper subdirectory is created (year → month → day → hour → minute). |
 
 By default, only messages are saved (`messages.json` + `messages.md`). Add content flags to include additional data.
 

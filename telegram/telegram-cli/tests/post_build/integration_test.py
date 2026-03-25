@@ -353,30 +353,71 @@ def integration_test(cli: str) -> tuple[int, int, int]:
     checks_count = 3
     passed_count = 0
     
+    _MEDIA_CAT_IT = {"media", "files", "music", "voice", "gifs", "links", "members"}
+
+    def _leaf_json_files(dialog_dir):
+        """Return all non-category messages.json paths under dialog_dir."""
+        result = []
+        for root, _dirs, files in os.walk(dialog_dir):
+            parts = os.path.relpath(root, dialog_dir).split(os.sep)
+            if any(p in _MEDIA_CAT_IT for p in parts):
+                continue
+            if "messages.json" in files:
+                result.append(os.path.join(root, "messages.json"))
+        return result
+
+    def _count_tree_messages(dialog_dir):
+        """Sum message counts across all non-category messages.json files."""
+        total = 0
+        for jf in _leaf_json_files(dialog_dir):
+            try:
+                with open(jf, encoding="utf-8") as fp:
+                    d = json.load(fp)
+                    if isinstance(d, list):
+                        total += len(d)
+            except Exception:
+                pass
+        return total
+
+    def _count_tree_md_headers(dialog_dir):
+        """Count ## headers across all non-category messages.md files."""
+        total = 0
+        for jf in _leaf_json_files(dialog_dir):
+            md = jf.replace("messages.json", "messages.md")
+            try:
+                with open(md, encoding="utf-8") as fp:
+                    total += sum(1 for l in fp if l.startswith("##"))
+            except Exception:
+                pass
+        return total
+
     if matching_dirs:
         dialog_dir = matching_dirs[0]
-        
-        # Check that messages.json exists in the dialog subdirectory
-        messages_json = os.path.join(dialog_dir, "messages.json")
-        messages_md = os.path.join(dialog_dir, "messages.md")
-        
+        leaf_jsons = _leaf_json_files(dialog_dir)
+
         print(f"\n  Checking directory structure at: {dialog_dir}")
-        
-        # Run checks directly since files are already created
-        check_fns = [
-            check_file_exists(messages_json),
-            check_file_exists(messages_md),
-            check_json_file_valid(messages_json),
-        ]
-        
-        for check_fn in check_fns:
-            check_result = check_fn()
-            if not check_result.passed:
-                print(f"  ✗ FAILED: {check_result.message}")
-            else:
-                passed_count += 1
-                print(f"    ✓ {check_result.message}")
+
+        checks_count = 3
+        passed_count = 0
+        if leaf_jsons:
+            messages_json = leaf_jsons[0]
+            messages_md = messages_json.replace("messages.json", "messages.md")
+            for check_fn in [
+                check_file_exists(messages_json),
+                check_file_exists(messages_md),
+                check_json_file_valid(messages_json),
+            ]:
+                check_result = check_fn()
+                if not check_result.passed:
+                    print(f"  ✗ FAILED: {check_result.message}")
+                else:
+                    passed_count += 1
+                    print(f"    ✓ {check_result.message}")
+        else:
+            print(f"  ✗ FAILED: No messages.json found in hierarchy under {dialog_dir}")
     else:
+        checks_count = 3
+        passed_count = 0
         # If no matching directory found, report failure
         print(f"  ✗ FAILED: No directory matching *_-4821106881 found in {backup_verify}")
         matching = glob.glob(os.path.join(backup_verify, "*"))
@@ -409,26 +450,29 @@ def integration_test(cli: str) -> tuple[int, int, int]:
     passed_count = 0
     
     if matching_dirs:
-        messages_json = os.path.join(matching_dirs[0], "messages.json")
-        
-        # Run checks directly since files are already created
-        check_fns = [
-            check_json_file_valid(messages_json),
-            check_json_array_length(messages_json, 30),  # Should have around 30 messages
-        ]
-        
-        for check_fn in check_fns:
-            check_result = check_fn()
-            if not check_result.passed:
-                print(f"  ✗ FAILED: {check_result.message}")
-            else:
+        leaf_jsons_10 = _leaf_json_files(matching_dirs[0])
+        if leaf_jsons_10:
+            messages_json = leaf_jsons_10[0]
+            r_valid = check_json_file_valid(messages_json)()
+            if r_valid.passed:
                 passed_count += 1
-                print(f"    ✓ {check_result.message}")
-    
+                print(f"    ✓ {r_valid.message}")
+            else:
+                print(f"  ✗ FAILED: {r_valid.message}")
+
+            total_tree = _count_tree_messages(matching_dirs[0])
+            if total_tree == 30:
+                passed_count += 1
+                print(f"    ✓ messages hierarchy contains {total_tree} messages (expected 30)")
+            else:
+                print(f"  ✗ FAILED: messages hierarchy contains {total_tree} messages (expected 30)")
+        else:
+            print(f"  ✗ FAILED: No messages.json found in tree under {matching_dirs[0]}")
+
     total_tests += 1
     total_checks += checks_count
     total_passed += passed_count
-    
+
     # Tests 11-18: DISABLED TEMPORARILY for debugging Issues 1 and 2
     # Tests 11-18: DISABLED TEMPORARILY for debugging Issues 1 and 2
     # These tests will be re-enabled after core pagination and message storage bugs are fixed
@@ -499,46 +543,21 @@ def integration_test(cli: str) -> tuple[int, int, int]:
     # Find dialog directory
     matching_dirs = glob.glob(os.path.join(backup_issue2, "*_-4821106881"))
     if matching_dirs:
-        messages_json = os.path.join(matching_dirs[0], "messages.json")
-        messages_md = os.path.join(matching_dirs[0], "messages.md")
-        
-        # Check messages.json
-        if os.path.exists(messages_json):
-            try:
-                with open(messages_json, 'r', encoding='utf-8') as f:
-                    msgs = json.load(f)
-                    json_count = len(msgs) if isinstance(msgs, list) else 0
-                    if json_count > 100:
-                        passed_count += 1
-                        print(f"    ✓ messages.json contains {json_count} messages (> 100)")
-                    else:
-                        print(f"    ✗ FAILED: messages.json contains {json_count} messages (expected > 100)")
-                    
-                    # If we know saved_count, verify it matches
-                    if saved_count and json_count != saved_count:
-                        print(f"    ⚠ Warning: messages.json has {json_count} msgs but stdout said {saved_count} saved")
-            except (json.JSONDecodeError, IOError) as e:
-                print(f"    ✗ FAILED: Could not read messages.json: {e}")
+        json_count = _count_tree_messages(matching_dirs[0])
+        if json_count > 100:
+            passed_count += 1
+            print(f"    ✓ messages hierarchy contains {json_count} messages (> 100)")
         else:
-            print(f"    ✗ FAILED: messages.json not found")
-        
-        # Check messages.md line count (should also be > 100)
-        if os.path.exists(messages_md):
-            try:
-                with open(messages_md, 'r', encoding='utf-8') as f:
-                    lines = f.readlines()
-                    # Rough check: each message is typically multiple lines, so count ## headers
-                    headers = [l for l in lines if l.startswith('##')]
-                    md_count = len(headers)
-                    if md_count > 100:
-                        passed_count += 1
-                        print(f"    ✓ messages.md contains {md_count} message headers (> 100)")
-                    else:
-                        print(f"    ✗ FAILED: messages.md contains {md_count} message headers (expected > 100)")
-            except IOError as e:
-                print(f"    ✗ FAILED: Could not read messages.md: {e}")
+            print(f"    ✗ FAILED: messages hierarchy contains {json_count} messages (expected > 100)")
+        if saved_count and json_count != saved_count:
+            print(f"    ⚠ Warning: tree has {json_count} msgs but stdout said {saved_count} saved")
+
+        md_count = _count_tree_md_headers(matching_dirs[0])
+        if md_count > 100:
+            passed_count += 1
+            print(f"    ✓ messages.md headers across tree: {md_count} (> 100)")
         else:
-            print(f"    ✗ FAILED: messages.md not found")
+            print(f"    ✗ FAILED: messages.md headers across tree: {md_count} (expected > 100)")
     else:
         print(f"    ✗ FAILED: Dialog directory not found")
     
@@ -674,6 +693,131 @@ def integration_test(cli: str) -> tuple[int, int, int]:
                 print(f"  ✗ FAILED: {r.message}")
     else:
         print(f"  ✗ FAILED: backup command failed (rc={rc_25}) or dialog dir not found")
+
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # -----------------------------------------------------------------------
+    # Tests 26-28: New flags --upto, --count, --split_threshold
+    # -----------------------------------------------------------------------
+
+    # Test 26: --upto filters out messages after the timestamp
+    test_name = "backup --upto filters out messages newer than the cutoff"
+    print(f"\n[Test 26] {test_name}")
+
+    backup_upto = "backup_upto"
+    if os.path.exists(backup_upto):
+        shutil.rmtree(backup_upto)
+
+    checks_count, passed_count = test_file_output(
+        cli,
+        f"backup -4821106881 --limit=500 --upto=2026-03-19T00:00:00+00:00 --outdir={backup_upto}",
+        # command must succeed (captured in test_file_output)
+    )
+
+    # Now manually count total messages in tree and compare
+    matching_dirs_26 = glob.glob(os.path.join(backup_upto, "*_-4821106881"))
+    checks_count = 2
+    passed_count = 0
+    if matching_dirs_26:
+        tree_count = _count_tree_messages(matching_dirs_26[0])
+        if tree_count == 480:
+            passed_count += 1
+            print(f"    ✓ --upto: tree contains {tree_count} messages (expected 480)")
+        else:
+            print(f"  ✗ FAILED: --upto: tree contains {tree_count} messages (expected 480)")
+
+        # Also verify it is strictly less than without --upto (500)
+        if tree_count < 500:
+            passed_count += 1
+            print(f"    ✓ --upto: {tree_count} < 500 (messages were filtered)")
+        else:
+            print(f"  ✗ FAILED: --upto: {tree_count} >= 500 (filter had no effect)")
+    else:
+        print(f"  ✗ FAILED: dialog dir not found after --upto backup")
+
+    if os.path.exists(backup_upto):
+        shutil.rmtree(backup_upto)
+
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # Test 27: --count prints totals, writes no files
+    test_name = "backup --count prints total + breakdown and creates no output files"
+    print(f"\n[Test 27] {test_name}")
+
+    backup_count_outdir = "backup_count_nowrite"
+    if os.path.exists(backup_count_outdir):
+        shutil.rmtree(backup_count_outdir)
+
+    checks_count, passed_count = test(
+        cli,
+        f"backup -4821106881 --count --limit=500 --outdir={backup_count_outdir}",
+        check_stdout_contains("Messages: 500 total"),
+        check_stdout_contains("photo: 86"),
+        check_stdout_contains("link/webpage: 24"),
+        check_stdout_contains("video: 10"),
+    )
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # Extra check: no backup directory was written
+    checks_count = 1
+    passed_count = 0
+    if not os.path.exists(backup_count_outdir):
+        passed_count += 1
+        print(f"    ✓ --count: no output directory created (no files written)")
+    else:
+        print(f"  ✗ FAILED: --count: output directory {backup_count_outdir!r} was created (should not write files)")
+        shutil.rmtree(backup_count_outdir)
+
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # Test 28: --split_threshold creates deeper hierarchy when count exceeds threshold
+    test_name = "backup --split_threshold=5 creates month-level subdirectory"
+    print(f"\n[Test 28] {test_name}")
+
+    backup_split = "backup_split"
+    if os.path.exists(backup_split):
+        shutil.rmtree(backup_split)
+
+    checks_count, passed_count = test_file_output(
+        cli,
+        f"backup -4821106881 --limit=20 --split_threshold=5 --outdir={backup_split}",
+    )
+
+    matching_dirs_28 = glob.glob(os.path.join(backup_split, "*_-4821106881"))
+    checks_count = 2
+    passed_count = 0
+    if matching_dirs_28:
+        dialog_dir_28 = matching_dirs_28[0]
+        # With 20 msgs > threshold=5, should drill past year → month level
+        # All 20 messages are from 2026-03: expect 2026/03/ directory
+        month_dir = os.path.join(dialog_dir_28, "2026", "03")
+        if os.path.isdir(month_dir):
+            passed_count += 1
+            print(f"    ✓ --split_threshold=5 created month subdir: {month_dir}")
+        else:
+            print(f"  ✗ FAILED: --split_threshold=5 month subdir not found: {month_dir}")
+            print(f"    tree: {list(os.walk(dialog_dir_28))}")
+
+        # Verify total message count is still 20
+        tree_count_28 = _count_tree_messages(dialog_dir_28)
+        if tree_count_28 == 20:
+            passed_count += 1
+            print(f"    ✓ --split_threshold=5 tree contains {tree_count_28} messages (expected 20)")
+        else:
+            print(f"  ✗ FAILED: --split_threshold=5 tree contains {tree_count_28} messages (expected 20)")
+    else:
+        print(f"  ✗ FAILED: dialog dir not found after --split_threshold backup")
+
+    if os.path.exists(backup_split):
+        shutil.rmtree(backup_split)
 
     total_tests += 1
     total_checks += checks_count

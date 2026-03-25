@@ -16,6 +16,7 @@ import os
 import sys
 import tempfile
 import time
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -310,6 +311,7 @@ def run_backup(
     *,
     dialog_id: int,
     since: str | None = None,
+    upto: str | None = None,
     limit: int = 100,
     outdir: str | None = None,
     media: bool = False,
@@ -320,12 +322,19 @@ def run_backup(
     gifs: bool = False,
     members: bool = False,
     estimate: bool = False,
+    count: bool = False,
+    split_threshold: int = 100,
 ) -> None:
     """Main entry point for the backup command."""
     since_dt = _parse_since(since)
+    upto_dt = _parse_upto(upto)
 
     if estimate:
         _run_estimate(dialog_id, since_dt, limit)
+        return
+
+    if count:
+        _run_count(dialog_id, since_dt, upto_dt, limit)
         return
 
     config = load_config()
@@ -354,7 +363,10 @@ def run_backup(
     # Fetch dialog name and determine output file path
     # This will happen in _async_backup where we're in the proper async context
     result = asyncio.run(
-        _async_backup(client, dialog_id, since_dt, limit, base_output_dir, enabled_categories)
+        _async_backup(
+            client, dialog_id, since_dt, limit, base_output_dir,
+            enabled_categories, upto_dt=upto_dt,
+        )
     )
     
     if not isinstance(result, tuple):
@@ -366,23 +378,9 @@ def run_backup(
 
     # Serialize all messages (both with and without media)
     data = [_message_to_dict(m, file_paths.get(m.id)) for m in messages]
-    
-    # DEBUG: Verify message counts
-    logger.info(f"DEBUG: run_backup received {len(messages)} messages, converting to data now...")
 
-    # Merge with existing data and write to main output directory
-    existing_data = _load_existing_data(output_dir / "messages.json")
-    merged = _merge_messages(existing_data, data)
-    
-    # DEBUG: Log message counts before and after merge
-    logger.info(f"DEBUG: Writing messages.json | input_msgs={len(messages)} | data_list={len(data)} | existing={len(existing_data)} | merged={len(merged)}")
-    
-    _atomic_write_json(output_dir / "messages.json", merged)
-    
-    # Generate messages.md file
-    md_content = _generate_messages_md(merged)
-    messages_md_path = output_dir / "messages.md"
-    messages_md_path.write_text(md_content, encoding="utf-8")
+    # Write messages to hierarchical time-based directory tree
+    _write_messages_hierarchically(output_dir, data, split_threshold)
     
     # If media categories are enabled, create subdirectories organized by media type
     if enabled_categories:
@@ -427,6 +425,7 @@ def run_backup(
 
 async def _async_backup(
     client, dialog_id, since_dt, limit, base_output_dir, enabled_categories=None,
+    upto_dt=None,
 ):
     """Connect, fetch dialog info, paginate, download media, extract members, disconnect. 
     Returns (messages, file_paths, pauses, elapsed, output_dir, members_data) or TgResult on error."""
@@ -443,8 +442,8 @@ async def _async_backup(
         _check_output_writable(output_dir / "messages.json")
         
         # T22 — scan existing
-        existing_ids: set[int] = _scan_existing(output_dir / "messages.json")
-        latest_local: datetime | None = _latest_timestamp(output_dir / "messages.json")
+        existing_ids: set[int] = _scan_existing_in_tree(output_dir)
+        latest_local: datetime | None = _latest_timestamp_in_tree(output_dir)
         
         # Determine total for progress
         count_result = await count_messages(client, dialog_id, since=since_dt)
@@ -527,7 +526,11 @@ async def _async_backup(
             _progress_bar(page_num, pages, fetched_count, new_to_fetch, elapsed, tty)
 
         elapsed = time.monotonic() - start_time
-        
+
+        # Apply --upto filter: discard messages after the upper timestamp bound
+        if upto_dt is not None:
+            all_messages = [m for m in all_messages if m.date <= upto_dt]
+
         # Show final progress bar at 100% completion
         if tty:
             _progress_bar(pages, pages, new_to_fetch, new_to_fetch, elapsed, tty)
@@ -629,6 +632,20 @@ def _parse_since(since: str | None) -> datetime | None:
         sys.exit(1)
 
 
+def _parse_upto(upto: str | None) -> datetime | None:
+    """Parse ISO 8601 string for --upto to datetime or return None."""
+    if upto is None:
+        return None
+    try:
+        dt = datetime.fromisoformat(upto)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except ValueError:
+        print(f"Error: Invalid --upto timestamp: {upto}", file=sys.stderr)
+        sys.exit(1)
+
+
 def _check_output_writable(output_path: Path) -> None:
     """T11 — check that we can write to the output directory."""
     parent = output_path.parent
@@ -680,3 +697,226 @@ def _merge_messages(existing: list[dict], new: list[dict]) -> list[dict]:
     for m in new:
         by_id[m["id"]] = m
     return sorted(by_id.values(), key=lambda m: m.get("date", ""))
+
+
+# ---------------------------------------------------------------------------
+# Time-hierarchy helpers (--split_threshold)
+# ---------------------------------------------------------------------------
+
+_MEDIA_CATEGORY_DIRS = frozenset({"media", "files", "music", "voice", "gifs", "links", "members"})
+
+
+def _parse_msg_date(date_val) -> datetime | None:
+    """Parse a date value from a message dict (handles datetime and ISO string)."""
+    if isinstance(date_val, datetime):
+        return date_val if date_val.tzinfo else date_val.replace(tzinfo=timezone.utc)
+    if isinstance(date_val, str):
+        try:
+            dt = datetime.fromisoformat(date_val.replace("Z", "+00:00"))
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        except ValueError:
+            return None
+    return None
+
+
+def _split_messages_by_time(
+    messages: list[dict], threshold: int
+) -> dict[tuple, list[dict]]:
+    """Group messages into time-based leaf buckets.
+
+    Year level is always created. Deeper levels (month, day, hour, minute)
+    are only created when the bucket count exceeds *threshold*.
+
+    Returns dict mapping a key tuple — e.g. (2026,) or (2026, 3) or
+    (2026, 3, 15) — to the list of messages in that leaf bucket.
+    """
+    def _split(msgs: list, prefix: tuple) -> dict:
+        if not msgs:
+            return {}
+        level = len(prefix)
+        # Year level: always split. Deeper levels: only when oversized.
+        should_split = (level == 0) or (level < 5 and len(msgs) > threshold)
+        if not should_split:
+            return {prefix: msgs}
+
+        buckets: dict[int, list] = defaultdict(list)
+        for msg in msgs:
+            d = _parse_msg_date(msg.get("date"))
+            if d is None:
+                buckets[-1].append(msg)
+                continue
+            if level == 0:
+                key = d.year
+            elif level == 1:
+                key = d.month
+            elif level == 2:
+                key = d.day
+            elif level == 3:
+                key = d.hour
+            else:
+                key = d.minute
+            buckets[key].append(msg)
+
+        result: dict[tuple, list] = {}
+        for key, bucket_msgs in buckets.items():
+            result.update(_split(bucket_msgs, prefix + (key,)))
+        return result
+
+    return _split(messages, ())
+
+
+def _bucket_to_subpath(key: tuple) -> Path:
+    """Convert a time-bucket key tuple to a relative Path.
+
+    (2026,)          → Path("2026")
+    (2026, 3)        → Path("2026/03")
+    (2026, 3, 15)    → Path("2026/03/15")
+    """
+    if not key:
+        return Path(".")
+    parts = [str(key[0])] + [f"{v:02d}" for v in key[1:]]
+    return Path(*parts)
+
+
+def _scan_existing_in_tree(dialog_dir: Path) -> set[int]:
+    """Return all message IDs from non-category messages.json files in the tree."""
+    ids: set[int] = set()
+    if not dialog_dir.is_dir():
+        return ids
+    for json_file in dialog_dir.rglob("messages.json"):
+        rel = json_file.relative_to(dialog_dir)
+        if any(part in _MEDIA_CATEGORY_DIRS for part in rel.parts):
+            continue
+        try:
+            data = json.loads(json_file.read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                ids.update(m["id"] for m in data if isinstance(m, dict) and "id" in m)
+        except (json.JSONDecodeError, OSError, KeyError):
+            pass
+    return ids
+
+
+def _latest_timestamp_in_tree(dialog_dir: Path) -> datetime | None:
+    """Return the newest message timestamp across all non-category leaf files."""
+    if not dialog_dir.is_dir():
+        return None
+    latest = None
+    for json_file in dialog_dir.rglob("messages.json"):
+        rel = json_file.relative_to(dialog_dir)
+        if any(part in _MEDIA_CATEGORY_DIRS for part in rel.parts):
+            continue
+        ts = _latest_timestamp(json_file)
+        if ts and (latest is None or ts > latest):
+            latest = ts
+    return latest
+
+
+def _load_all_messages_from_tree(dialog_dir: Path) -> list[dict]:
+    """Load all messages from non-category leaf files in the hierarchy."""
+    all_msgs: list[dict] = []
+    if not dialog_dir.is_dir():
+        return all_msgs
+    for json_file in dialog_dir.rglob("messages.json"):
+        rel = json_file.relative_to(dialog_dir)
+        if any(part in _MEDIA_CATEGORY_DIRS for part in rel.parts):
+            continue
+        all_msgs.extend(_load_existing_data(json_file))
+    return all_msgs
+
+
+def _write_messages_hierarchically(
+    output_dir: Path, new_data: list[dict], split_threshold: int
+) -> None:
+    """Write messages to a time-based directory hierarchy.
+
+    Reads all existing messages from the tree, merges with *new_data*,
+    re-splits by split_threshold, and rewrites all affected leaf files.
+    """
+    all_existing = _load_all_messages_from_tree(output_dir)
+    all_merged = _merge_messages(all_existing, new_data)
+    grouped = _split_messages_by_time(all_merged, split_threshold)
+    for bucket_key, bucket_msgs in grouped.items():
+        leaf_dir = output_dir / _bucket_to_subpath(bucket_key)
+        leaf_dir.mkdir(parents=True, exist_ok=True)
+        _atomic_write_json(leaf_dir / "messages.json", bucket_msgs)
+        (leaf_dir / "messages.md").write_text(
+            _generate_messages_md(bucket_msgs), encoding="utf-8"
+        )
+
+
+# ---------------------------------------------------------------------------
+# --count mode
+# ---------------------------------------------------------------------------
+
+
+async def _async_count_messages(client, dialog_id, since_dt, upto_dt, limit):
+    """Connect, paginate messages (metadata only), apply upto filter, return list."""
+    async with client:
+        count_result = await count_messages(client, dialog_id, since=since_dt)
+        if not count_result.ok:
+            return count_result
+
+        total = count_result.payload
+        effective = min(total, limit) if limit else total
+
+        all_msgs = []
+        remaining = effective
+        resume_since = since_dt
+
+        while remaining > 0:
+            page_limit = min(PAGE_SIZE, remaining)
+            r = await read_messages(
+                client, dialog_id, since=resume_since,
+                limit=page_limit, for_pagination=True,
+            )
+            if not r.ok:
+                return r
+            page = r.payload
+            if not page:
+                break
+            filtered = page if upto_dt is None else [m for m in page if m.date <= upto_dt]
+            all_msgs.extend(filtered)
+            remaining -= len(page)
+            if page:
+                resume_since = page[-1].date
+
+        class _R:
+            ok = True
+            payload = all_msgs
+            error = None
+
+        return _R()
+
+
+def _run_count(
+    dialog_id: int,
+    since_dt: datetime | None,
+    upto_dt: datetime | None,
+    limit: int,
+) -> None:
+    """Fetch messages, count by type, print summary, and exit."""
+    config = load_config()
+    client = create_client(config["api_id"], config["api_hash"], config["session"])
+    result = asyncio.run(_async_count_messages(client, dialog_id, since_dt, upto_dt, limit))
+    if not result.ok:
+        format_error_and_exit(result.error)
+
+    messages = result.payload
+    total = len(messages)
+
+    media_counts: dict[str, int] = {}
+    for msg in messages:
+        if msg.has_media and msg.media_type:
+            media_counts[msg.media_type] = media_counts.get(msg.media_type, 0) + 1
+
+    print(f"Messages: {total} total")
+    _TYPE_LABELS = {
+        "photo": "photo", "video": "video",
+        "audio": "music/audio", "voice": "voice",
+        "gif": "gif", "document": "file/document",
+        "webpage": "link/webpage",
+    }
+    for media_type, cnt in sorted(media_counts.items(), key=lambda x: -x[1]):
+        label = _TYPE_LABELS.get(media_type, media_type)
+        print(f"  {label}: {cnt}")
+

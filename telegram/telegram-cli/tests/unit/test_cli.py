@@ -203,6 +203,7 @@ class TestMain:
             mock_b.assert_called_once_with(
                 dialog_id=100,
                 since=None,
+                upto=None,
                 limit=500,
                 outdir="/tmp/backups",
                 media=True,
@@ -213,6 +214,8 @@ class TestMain:
                 gifs=False,
                 members=False,
                 estimate=True,
+                count=False,
+                split_threshold=100,
             )
 
     def test_main_download_media(self):

@@ -190,8 +190,8 @@ class TestBackupToFile:
             from src.commands.backup import run_backup
             run_backup(dialog_id=100, limit=100, outdir=str(output_dir))
 
-        # File is now in subdirectory <dialog_name>_<dialog_id>
-        output_file = output_dir / "Test Dialog_100" / "messages.json"
+        # File is now in subdirectory <dialog_name>_<dialog_id>/<year>
+        output_file = output_dir / "Test Dialog_100" / "2026" / "messages.json"
         assert output_file.exists()
         data = json.loads(output_file.read_text())
         assert len(data) == 2
@@ -270,8 +270,9 @@ class TestResumable:
         # With new structure: backup/<dialog_name>_<dialog_id>/messages.json
         output_dir = tmp_path / "backup"
         dialog_subdir = output_dir / "Test Dialog_100"
-        dialog_subdir.mkdir(parents=True)
-        output_file = dialog_subdir / "messages.json"
+        year_dir = dialog_subdir / "2026"
+        year_dir.mkdir(parents=True)
+        output_file = year_dir / "messages.json"
         output_file.write_text(json.dumps([
             {"id": 1, "dialog_id": 100, "text": "Old", "date": "2026-06-01T12:00:00+00:00",
              "sender_id": None, "sender_name": None, "has_media": False, "media_type": None},
@@ -514,7 +515,7 @@ class TestPaginationDirection:
             from src.commands.backup import run_backup
             run_backup(dialog_id=100, limit=10, outdir=str(tmp_path))
 
-        output_file = tmp_path / "Test Dialog_100" / "messages.json"
+        output_file = tmp_path / "Test Dialog_100" / "2026" / "messages.json"
         assert output_file.exists()
         data = json.loads(output_file.read_text())
         ids = {m["id"] for m in data}
@@ -523,3 +524,293 @@ class TestPaginationDirection:
             "Likely cause: pagination went in the wrong direction (forward instead of backward), "
             "re-fetching the same newest messages instead of older ones."
         )
+
+
+# ---------------------------------------------------------------------------
+# --upto parsing and filtering (new feature)
+# ---------------------------------------------------------------------------
+
+
+def _make_msg_at(id, year, month=1, day=1, hour=0, minute=0):
+    """Create a _FakeMessageInfo with a specific datetime."""
+    from datetime import timedelta
+    dt = datetime(year, month, day, hour, minute, 0, tzinfo=timezone.utc)
+    return _FakeMessageInfo(id=id, dialog_id=100, text=f"msg{id}", date=dt)
+
+
+class TestParseUpto:
+
+    def test_parse_upto_none(self):
+        """_parse_upto returns None for None input."""
+        from src.commands.backup import _parse_upto
+        assert _parse_upto(None) is None
+
+    def test_parse_upto_valid(self):
+        """_parse_upto parses ISO 8601 string and attaches UTC tz."""
+        from src.commands.backup import _parse_upto
+        dt = _parse_upto("2026-06-30T23:59:59")
+        assert dt is not None
+        assert dt.year == 2026
+        assert dt.month == 6
+        assert dt.day == 30
+        assert dt.tzinfo == timezone.utc
+
+    def test_parse_upto_invalid_exits(self, capsys):
+        """_parse_upto exits with code 1 for invalid timestamp."""
+        from src.commands.backup import _parse_upto
+        with pytest.raises(SystemExit) as exc_info:
+            _parse_upto("not-a-date")
+        assert exc_info.value.code == 1
+
+
+class TestUptoFilter:
+
+    def test_upto_excludes_messages_after_cutoff(self, tmp_path, capsys):
+        """Backup with --upto only includes messages on or before the cutoff."""
+        # msg1 = 2026-01 (included), msg2 = 2026-06 (included), msg3 = 2026-12 (excluded)
+        msg1 = _make_msg_at(1, 2026, 1, 1)
+        msg2 = _make_msg_at(2, 2026, 6, 1)
+        msg3 = _make_msg_at(3, 2026, 12, 1)
+
+        count_result = _FakeResult(payload=3)
+        page_result = _FakeResult(payload=[msg3, msg2, msg1])  # newest-first
+
+        dialog_info = _FakeDialogInfo(id=100, name="Test Dialog")
+        dialogs_result = _FakeResult(payload=[dialog_info])
+
+        with (
+            patch("src.commands.backup.load_config", return_value={
+                "api_id": 1, "api_hash": "a", "session": "s"
+            }),
+            patch("src.commands.backup.create_client") as mock_cc,
+            patch("src.commands.backup.get_dialogs", new_callable=AsyncMock, return_value=dialogs_result),
+            patch("src.commands.backup.count_messages", new_callable=AsyncMock, return_value=count_result),
+            patch("src.commands.backup.read_messages", new_callable=AsyncMock, return_value=page_result),
+            patch("src.commands.backup._is_tty", return_value=False),
+        ):
+            mock_cc.return_value = _make_client_mock()
+            from src.commands.backup import run_backup
+            run_backup(dialog_id=100, limit=10, outdir=str(tmp_path),
+                       upto="2026-06-30T23:59:59")
+
+        # Find messages.json anywhere in the tree
+        all_json = list((tmp_path / "Test Dialog_100").rglob("messages.json"))
+        assert all_json, "No messages.json written"
+        all_ids = set()
+        for f in all_json:
+            for m in json.loads(f.read_text()):
+                all_ids.add(m["id"])
+        assert 3 not in all_ids, "msg3 (2026-12) should have been filtered by --upto"
+        assert {1, 2} == all_ids
+
+
+# ---------------------------------------------------------------------------
+# --count mode (new feature)
+# ---------------------------------------------------------------------------
+
+
+class TestCountMode:
+
+    def test_count_prints_total_and_does_not_write(self, tmp_path, capsys):
+        """--count prints message total and exits without writing any files."""
+        msgs = [_make_msg_at(1, 2026, 1), _make_msg_at(2, 2026, 2)]
+        count_result = _FakeResult(payload=2)
+        page_result = _FakeResult(payload=msgs)
+
+        dialog_info = _FakeDialogInfo(id=100, name="Test Dialog")
+        dialogs_result = _FakeResult(payload=[dialog_info])
+
+        with (
+            patch("src.commands.backup.load_config", return_value={
+                "api_id": 1, "api_hash": "a", "session": "s"
+            }),
+            patch("src.commands.backup.create_client") as mock_cc,
+            patch("src.commands.backup.get_dialogs", new_callable=AsyncMock, return_value=dialogs_result),
+            patch("src.commands.backup.count_messages", new_callable=AsyncMock, return_value=count_result),
+            patch("src.commands.backup.read_messages", new_callable=AsyncMock, return_value=page_result),
+            patch("src.commands.backup._is_tty", return_value=False),
+        ):
+            mock_cc.return_value = _make_client_mock()
+            from src.commands.backup import run_backup
+            run_backup(dialog_id=100, limit=10, outdir=str(tmp_path), count=True)
+
+        out = capsys.readouterr().out
+        assert "2" in out  # total count printed
+        # No files written
+        assert not list(tmp_path.rglob("messages.json"))
+
+    def test_count_shows_media_breakdown(self, tmp_path, capsys):
+        """--count output includes a breakdown of media types."""
+        msg_text = _make_msg_at(1, 2026, 1)
+        msg_photo = _FakeMessageInfo(2, 100, "", datetime(2026, 2, 1, tzinfo=timezone.utc),
+                                     has_media=True, media_type="photo")
+        msgs = [msg_photo, msg_text]
+        count_result = _FakeResult(payload=2)
+        page_result = _FakeResult(payload=msgs)
+
+        dialog_info = _FakeDialogInfo(id=100, name="Test Dialog")
+        dialogs_result = _FakeResult(payload=[dialog_info])
+
+        with (
+            patch("src.commands.backup.load_config", return_value={
+                "api_id": 1, "api_hash": "a", "session": "s"
+            }),
+            patch("src.commands.backup.create_client") as mock_cc,
+            patch("src.commands.backup.get_dialogs", new_callable=AsyncMock, return_value=dialogs_result),
+            patch("src.commands.backup.count_messages", new_callable=AsyncMock, return_value=count_result),
+            patch("src.commands.backup.read_messages", new_callable=AsyncMock, return_value=page_result),
+            patch("src.commands.backup._is_tty", return_value=False),
+        ):
+            mock_cc.return_value = _make_client_mock()
+            from src.commands.backup import run_backup
+            run_backup(dialog_id=100, limit=10, outdir=str(tmp_path), count=True)
+
+        out = capsys.readouterr().out
+        assert "photo" in out.lower() or "media" in out.lower()
+
+
+# ---------------------------------------------------------------------------
+# _split_messages_by_time helper (new feature)
+# ---------------------------------------------------------------------------
+
+
+class TestSplitMessagesByTime:
+
+    def _msg_dict(self, id, year, month=1, day=1):
+        return {
+            "id": id,
+            "date": datetime(year, month, day, tzinfo=timezone.utc).isoformat(),
+            "text": f"msg{id}",
+        }
+
+    def test_single_message_goes_into_year_bucket(self):
+        """A single message always produces a year-level bucket."""
+        from src.commands.backup import _split_messages_by_time
+        msgs = [self._msg_dict(1, 2026)]
+        result = _split_messages_by_time(msgs, threshold=100)
+        assert (2026,) in result
+        assert len(result[(2026,)]) == 1
+
+    def test_no_split_when_count_below_threshold(self):
+        """All messages in the same year stay in one bucket when count <= threshold."""
+        from src.commands.backup import _split_messages_by_time
+        msgs = [self._msg_dict(i, 2026, month=i % 12 + 1) for i in range(1, 6)]
+        result = _split_messages_by_time(msgs, threshold=10)
+        assert (2026,) in result
+        assert len(result[(2026,)]) == 5
+        # No month-level buckets
+        assert not any(len(k) > 1 for k in result)
+
+    def test_split_into_years_when_messages_in_multiple_years(self):
+        """Messages from different years end up in different buckets."""
+        from src.commands.backup import _split_messages_by_time
+        msgs = [self._msg_dict(1, 2025), self._msg_dict(2, 2026)]
+        result = _split_messages_by_time(msgs, threshold=5)
+        assert (2025,) in result
+        assert (2026,) in result
+
+    def test_split_year_to_months_when_above_threshold(self):
+        """Messages in one year split into months when count > threshold."""
+        from src.commands.backup import _split_messages_by_time
+        # 3 messages in 2026, threshold=2 → should split by month
+        msgs = [
+            self._msg_dict(1, 2026, month=1),
+            self._msg_dict(2, 2026, month=2),
+            self._msg_dict(3, 2026, month=3),
+        ]
+        result = _split_messages_by_time(msgs, threshold=2)
+        # Should produce month-level buckets under 2026
+        month_keys = [k for k in result if len(k) == 2 and k[0] == 2026]
+        assert len(month_keys) == 3  # one per month
+
+    def test_split_month_to_days_when_above_threshold(self):
+        """Messages in one month split into days when count > threshold."""
+        from src.commands.backup import _split_messages_by_time
+        msgs = [
+            self._msg_dict(i, 2026, month=1, day=i)
+            for i in range(1, 4)  # 3 messages: Jan 1, 2, 3
+        ]
+        result = _split_messages_by_time(msgs, threshold=1)
+        # With threshold=1, year → month → day
+        day_keys = [k for k in result if len(k) == 3]
+        assert len(day_keys) == 3
+
+
+# ---------------------------------------------------------------------------
+# _bucket_to_subpath helper (new feature)
+# ---------------------------------------------------------------------------
+
+
+class TestBucketToSubpath:
+
+    def test_year_only(self):
+        """(2026,) → Path('2026')"""
+        from src.commands.backup import _bucket_to_subpath
+        assert _bucket_to_subpath((2026,)) == Path("2026")
+
+    def test_year_month(self):
+        """(2026, 3) → Path('2026/03')"""
+        from src.commands.backup import _bucket_to_subpath
+        assert _bucket_to_subpath((2026, 3)) == Path("2026/03")
+
+    def test_year_month_day(self):
+        """(2026, 3, 15) → Path('2026/03/15')"""
+        from src.commands.backup import _bucket_to_subpath
+        assert _bucket_to_subpath((2026, 3, 15)) == Path("2026/03/15")
+
+    def test_year_month_day_hour(self):
+        """(2026, 3, 15, 9) → Path('2026/03/15/09')"""
+        from src.commands.backup import _bucket_to_subpath
+        assert _bucket_to_subpath((2026, 3, 15, 9)) == Path("2026/03/15/09")
+
+    def test_year_month_day_hour_minute(self):
+        """(2026, 3, 15, 9, 5) → Path('2026/03/15/09/05')"""
+        from src.commands.backup import _bucket_to_subpath
+        assert _bucket_to_subpath((2026, 3, 15, 9, 5)) == Path("2026/03/15/09/05")
+
+
+# ---------------------------------------------------------------------------
+# _scan_existing_in_tree helper (new feature)
+# ---------------------------------------------------------------------------
+
+
+class TestScanExistingInTree:
+
+    def test_finds_messages_in_year_dir(self, tmp_path):
+        """IDs from year-level messages.json are found."""
+        from src.commands.backup import _scan_existing_in_tree
+        year_dir = tmp_path / "2026"
+        year_dir.mkdir()
+        (year_dir / "messages.json").write_text(
+            json.dumps([{"id": 1}, {"id": 2}])
+        )
+        ids = _scan_existing_in_tree(tmp_path)
+        assert ids == {1, 2}
+
+    def test_finds_messages_in_nested_dirs(self, tmp_path):
+        """IDs from nested year/month dirs are all found."""
+        from src.commands.backup import _scan_existing_in_tree
+        (tmp_path / "2025").mkdir()
+        (tmp_path / "2025" / "messages.json").write_text(json.dumps([{"id": 10}]))
+        (tmp_path / "2026" / "03").mkdir(parents=True)
+        (tmp_path / "2026" / "03" / "messages.json").write_text(json.dumps([{"id": 20}]))
+        ids = _scan_existing_in_tree(tmp_path)
+        assert ids == {10, 20}
+
+    def test_skips_media_category_dirs(self, tmp_path):
+        """messages.json inside media/ category dir is NOT scanned."""
+        from src.commands.backup import _scan_existing_in_tree
+        media_dir = tmp_path / "media"
+        media_dir.mkdir()
+        (media_dir / "messages.json").write_text(json.dumps([{"id": 99}]))
+        # No time-based messages at all
+        ids = _scan_existing_in_tree(tmp_path)
+        assert 99 not in ids
+
+    def test_legacy_flat_file_at_dialog_root(self, tmp_path):
+        """Legacy flat messages.json at dialog root is included in scan."""
+        from src.commands.backup import _scan_existing_in_tree
+        (tmp_path / "messages.json").write_text(json.dumps([{"id": 42}]))
+        ids = _scan_existing_in_tree(tmp_path)
+        assert 42 in ids
+
