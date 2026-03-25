@@ -500,9 +500,12 @@ async def _async_backup(
                 break
             
             all_messages.extend(new_msgs)
+            # Track collected IDs so boundary-message overlaps are deduplicated
+            # even if the library returns the same message on two adjacent pages.
+            existing_ids.update(m.id for m in new_msgs)
             fetched_count += len(new_msgs)
             page_num += 1
-            remaining -= len(new_msgs)  # FIX: Only count new messages, not duplicates
+            remaining -= len(new_msgs)
             
             # DEBUG: Log page fetch details TO STDERR
             msg = f"[PAGINATION] Page {page_num}: fetched {len(page_msgs)}, new {len(new_msgs)}, total_collected={len(all_messages)}, remaining={remaining}"

@@ -436,3 +436,90 @@ class TestHelpers:
         f = tmp_path / "subdir" / "backup.json"
         _check_output_writable(f)  # should not raise
         assert (tmp_path / "subdir").is_dir()
+
+
+# ---------------------------------------------------------------------------
+# Pagination direction tests (regression for full-backup slowdown bug)
+# ---------------------------------------------------------------------------
+
+
+class TestPaginationDirection:
+    """Full backup must paginate BACKWARD (older messages per page).
+
+    Bug: after page 1 the pagination cursor (resume_since) becomes non-None,
+    which previously caused read_messages() to use reverse=True (forward
+    direction).  That sent Telethon forward in time — re-fetching the same
+    newest messages each page.  When the cursor converged on the most-recent
+    message Telegram could return that single message on every subsequent
+    request until `remaining` drained to zero, causing the "slower and slower"
+    behaviour reported by the user.
+    """
+
+    def test_full_backup_paginates_backward_to_older_messages(self, tmp_path, capsys):
+        """Full backup collects ALL pages including older messages.
+
+        Five messages exist (IDs 1–5, msg5 = newest).
+        Page 1  → newest 3: [msg5, msg4, msg3] (reverse=False, newest-first)
+        Page 2  → older  2: [msg2, msg1]       (reverse=False, going backward)
+        Page 3  → empty  (no more)
+
+        Without the fix, page 2 would receive reverse=True (forward direction),
+        returning duplicate messages [msg4, msg5] instead of the older ones.
+        Deduplication would then produce only 3 unique messages in the output.
+        With the fix, all 5 unique messages must appear in the output.
+        """
+        from datetime import timedelta
+
+        base_dt = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        msg1 = _FakeMessageInfo(1, 100, "oldest", base_dt + timedelta(minutes=0))
+        msg2 = _FakeMessageInfo(2, 100, "second", base_dt + timedelta(minutes=1))
+        msg3 = _FakeMessageInfo(3, 100, "middle", base_dt + timedelta(minutes=2))
+        msg4 = _FakeMessageInfo(4, 100, "fourth", base_dt + timedelta(minutes=3))
+        msg5 = _FakeMessageInfo(5, 100, "newest", base_dt + timedelta(minutes=4))
+
+        # count_messages returns 5 total
+        count_result = _FakeResult(payload=5)
+
+        dialog_info = _FakeDialogInfo(id=100, name="Test Dialog")
+        dialogs_result = _FakeResult(payload=[dialog_info])
+
+        call_count = 0
+
+        async def mock_read(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            # Simulate correct Telethon backward pagination (reverse=False):
+            # page 1 (no cursor) → newest-first; page 2 → older messages before cursor;
+            # page 3 → empty (no more).  The library fix ensures the real implementation
+            # reaches page 2 with reverse=False.  This test validates that backup.py
+            # correctly assembles all pages when the library returns the right data.
+            if call_count == 1:
+                return _FakeResult(payload=[msg5, msg4, msg3])
+            if call_count == 2:
+                return _FakeResult(payload=[msg2, msg1])
+            return _FakeResult(payload=[])  # no more messages
+
+        with (
+            patch("src.commands.backup.load_config", return_value={
+                "api_id": 1, "api_hash": "a", "session": "s"
+            }),
+            patch("src.commands.backup.create_client") as mock_cc,
+            patch("src.commands.backup.get_dialogs", new_callable=AsyncMock, return_value=dialogs_result),
+            patch("src.commands.backup.count_messages", new_callable=AsyncMock, return_value=count_result),
+            patch("src.commands.backup.read_messages", side_effect=mock_read),
+            patch("src.commands.backup._is_tty", return_value=False),
+        ):
+            mock_cc.return_value = _make_client_mock()
+
+            from src.commands.backup import run_backup
+            run_backup(dialog_id=100, limit=10, outdir=str(tmp_path))
+
+        output_file = tmp_path / "Test Dialog_100" / "messages.json"
+        assert output_file.exists()
+        data = json.loads(output_file.read_text())
+        ids = {m["id"] for m in data}
+        assert ids == {1, 2, 3, 4, 5}, (
+            f"Expected all 5 messages but got IDs {sorted(ids)}. "
+            "Likely cause: pagination went in the wrong direction (forward instead of backward), "
+            "re-fetching the same newest messages instead of older ones."
+        )

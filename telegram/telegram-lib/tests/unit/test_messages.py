@@ -120,6 +120,32 @@ class TestReadMessages:
         assert not result.ok
         assert result.error.code == ErrorCode.NETWORK_ERROR
 
+    @pytest.mark.asyncio
+    async def test_read_messages_for_pagination_uses_backward_direction(self):
+        """When for_pagination=True, Telethon must be called with reverse=False.
+
+        Regression test for the full-backup slowdown bug:
+        Previously `reverse = since is not None` evaluated to True for pagination,
+        causing Telethon to walk FORWARD in time (returning the same newest messages
+        on every page).  The fix changes the expression to
+        `reverse = not for_pagination and since is not None` so that pagination
+        always walks BACKWARD (older messages per page).
+        """
+        from telegram_lib.messages import read_messages
+
+        client = _mock_client()
+        client.get_entity = AsyncMock(return_value=_mock_entity())
+        client.get_messages = AsyncMock(return_value=[])
+
+        await read_messages(client, 123, since=SINCE, for_pagination=True)
+
+        call_kwargs = client.get_messages.call_args
+        assert call_kwargs.kwargs.get("reverse") is False, (
+            "for_pagination=True must call get_messages with reverse=False "
+            "(backward/older-first direction); got reverse=True which walks forward "
+            "and re-fetches the same newest messages on every page."
+        )
+
 
 # -----------------------------------------------------------------------
 # F2 — send_message

@@ -3,8 +3,10 @@
 # Build telegram-cli in all three formats: Python archive (.pyz), Windows binary (.exe), and macOS binary.
 # This script is designed for CI/CD pipelines or developers who want to build all variants at once.
 #
-# Usage:
-#   bash build_all.sh
+# Usage (from any directory):
+#   bash telegram/telegram-cli/tools/build_all_platform.sh
+#   # or from inside telegram/telegram-cli/:
+#   bash tools/build_all_platform.sh
 #
 # The script will:
 #   1. Build the Python archive (.pyz) — works on any OS
@@ -17,7 +19,10 @@
 
 set -e  # Exit on any error in sequence
 
-cd telegram/telegram-cli
+# Resolve the telegram-cli root regardless of where the script is called from
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLI_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$CLI_ROOT"
 
 echo "================================"
 echo "Building telegram-cli (all formats)"

@@ -86,7 +86,10 @@ async def read_messages(
             entity,
             limit=limit,
             offset_date=since,
-            reverse=since is not None,
+            # Pagination (for_pagination=True) goes BACKWARD — get messages before the
+            # cursor date — so reverse must be False.  Incremental backup goes FORWARD
+            # (messages after `since`) so reverse is True when since is set.
+            reverse=not for_pagination and since is not None,
         )
         result: list[MessageInfo] = []
         peer_id = _resolve_peer_id(entity)
