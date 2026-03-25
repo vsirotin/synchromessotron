@@ -55,7 +55,7 @@ async def get_members(
     """
     try:
         entity = await client.get_entity(dialog_id)
-        
+
         # Check if entity is a group or channel (has members)
         if isinstance(entity, User):
             return TgResult(
@@ -64,7 +64,7 @@ async def get_members(
                     "Cannot retrieve members from a private user chat",
                 )
             )
-        
+
         if not isinstance(entity, (Chat, Channel)):
             return TgResult(
                 error=TgError(
@@ -72,23 +72,23 @@ async def get_members(
                     "Dialog is not a group or channel",
                 )
             )
-        
+
         members: list[MemberInfo] = []
         try:
             async for member in client.iter_participants(entity):
                 user = member.username if hasattr(member, "username") else None
                 name = ""
-                
+
                 # Build name from first_name and last_name
                 if hasattr(member, "first_name") and member.first_name:
                     name = member.first_name
                 if hasattr(member, "last_name") and member.last_name:
                     name = f"{name} {member.last_name}".strip()
-                
+
                 # If no name, use username or ID as fallback
                 if not name:
                     name = user or f"User {member.id}"
-                
+
                 members.append(
                     MemberInfo(
                         id=member.id,
@@ -102,7 +102,7 @@ async def get_members(
             if "CHANNELS_TOO_LARGE" in str(exc) or "USER_PRIVACY_RESTRICTED" in str(exc):
                 return TgResult(payload=[])
             raise
-        
+
         return TgResult(payload=members)
     except ValueError as exc:
         return TgResult(error=TgError(ErrorCode.ENTITY_NOT_FOUND, str(exc)))

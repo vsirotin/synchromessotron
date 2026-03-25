@@ -54,3 +54,14 @@ Develop library functions in the following order:
 ### 7. Stateless by default
 
 All functions must be stateless unless the specification explicitly requires state. A function receives all necessary context through its parameters and produces output solely through its return value.
+
+### 8. Lint check after every code change
+
+After every change to library source files, run `ruff check` before committing:
+
+```bash
+cd <library-root>
+.venv/bin/python3 -m ruff check .
+```
+
+All errors must be resolved before proceeding to post-task (version bump, release notes). Auto-fixable errors (`[*]` in ruff output) can be applied with `--fix`; non-auto-fixable errors must be corrected manually. A clean ruff run is a hard gate — do not skip it even for cosmetic or style-only changes.

@@ -66,11 +66,11 @@ async def download_media(
 
         dest = Path(dest_dir)
         dest.mkdir(parents=True, exist_ok=True)
-        
+
         # Try to download media - some messages may not have downloadable media
         try:
             file_path = await client.download_media(msg, file=str(dest))
-        except TypeError as e:
+        except TypeError:
             # Common error with certain message types that don't have downloadable media
             return TgResult(
                 error=TgError(
@@ -78,12 +78,12 @@ async def download_media(
                     f"Message {message_id} media format not downloadable",
                 )
             )
-        except Exception as e:
-            # Catch any other errors  
+        except Exception as exc:
+            # Catch any other errors
             return TgResult(
                 error=TgError(
                     ErrorCode.ENTITY_NOT_FOUND,
-                    f"Failed to download message {message_id} media: {type(e).__name__}",
+                    f"Failed to download message {message_id} media: {type(exc).__name__}",
                 )
             )
 
@@ -93,17 +93,17 @@ async def download_media(
             )
 
         p = Path(file_path)
-        
+
         # Try to get mime type, but don't fail if there's an error
         mime_type = None
         try:
             mime_type = getattr(msg.media, "mime_type", None)
             if not mime_type:
                 mime_type = getattr(getattr(msg.media, "document", None), "mime_type", None)
-        except:
+        except Exception:
             # If we can't get mime type, just use None
             pass
-        
+
         return TgResult(
             payload=MediaResult(
                 message_id=message_id,

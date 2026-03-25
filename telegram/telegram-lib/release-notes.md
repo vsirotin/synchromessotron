@@ -1,5 +1,8 @@
 # Project telegram/telegram-lib. Release notes 
 
+## Version: 1.2.7
+Fixed 13 ruff lint errors in `media.py` and `members.py` that caused CI to fail: removed whitespace-only blank lines (W293), removed trailing whitespace (W291), replaced unused exception variable bindings `except TypeError as e` / `except Exception as e` with bare form or renamed to `exc` (F841), replaced bare `except:` with `except Exception:` (E722). All 52 tests pass, `ruff check` clean.
+
 ## Version: 1.2.6
 Fixed critical full-backup slowdown: `read_messages()` was calling Telethon with `reverse=True` when a pagination cursor (`since`) was set, causing it to walk **forward** in time (re-fetching the same newest messages on every page after page 1). Fixed by changing the direction expression to `reverse = not for_pagination and since is not None` so that pagination always walks backward (older messages per page) while incremental backup continues to walk forward. Added regression test `test_read_messages_for_pagination_uses_backward_direction` that directly asserts Telethon is called with `reverse=False` for `for_pagination=True`. All 24 tests pass.
 

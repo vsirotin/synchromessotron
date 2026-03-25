@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.29
+Dependency update: telegram-lib bumped to 1.2.7 (ruff lint fixes in media.py and members.py — no functional change). All 115 unit tests pass.
+
 ## Version: 1.0.28
 Fixed full-backup slowdown bug where messages after ~100–200 were processed progressively slower: (1) Root cause confirmed: `read_messages()` in telegram-lib used `reverse=True` when a pagination cursor was present, telling Telethon to walk forward (re-fetching the same newest messages). After the dialog had no more "forward" messages, Telegram returned 0–1 boundary messages per API call, draining `remaining` one tick at a time and incurring a rate-limit pause each round; (2) Fixed in telegram-lib 1.2.6: `reverse` is now `False` for pagination so Telethon walks backward (older messages per page); (3) Defensive fix in backup.py pagination loop: `existing_ids` is now updated with each page's collected IDs so boundary-message overlap is deduplicated within a single run; (4) Added regression test `TestPaginationDirection.test_full_backup_paginates_backward_to_older_messages` in test_backup.py; (5) Moved workspace-root `build_all.sh` into `telegram/telegram-cli/tools/build_all_platform.sh` and updated it to resolve its own path so it works when called from any directory; (6) Renamed `telegram-cli-post-task` skill to `telegram-cli-development` and extended it to cover the full development lifecycle (TDD, unit tests, integration tests in `dist/`, build scripts, pre-release gate). All 115 unit tests pass.
 
