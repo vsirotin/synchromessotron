@@ -269,6 +269,65 @@ By default, only **messages** are backed up (`messages.json` + `messages.md`). T
 
 Each content sub-directory follows the same time-based splitting rule as messages.
 
+Example — estimate time before starting a large backup:
+
+```
+python3 telegram-cli.pyz backup -1001234567890 --limit=5000 --estimate
+```
+
+Example — preview message and file counts without downloading anything:
+
+```
+python3 telegram-cli.pyz backup -1001234567890 --count
+```
+
+Expected output:
+
+```
+Messages: 350 total
+  photo: 42
+  link/webpage: 8
+  video: 5
+  file/document: 2
+```
+
+Example — incremental backup using `--since` (only messages after a date):
+
+```
+python3 telegram-cli.pyz backup -1001234567890 --since=2026-01-01T00:00:00+00:00
+```
+
+Example — archive a historical snapshot using `--upto` (messages on or before a date):
+
+```
+python3 telegram-cli.pyz backup -1001234567890 --upto=2025-12-31T23:59:59+00:00 --limit=1000
+```
+
+Example — backup a specific time window with `--since` and `--upto` (**correct combination** — `since` before `upto`):
+
+```
+python3 telegram-cli.pyz backup -1001234567890 \
+    --since=2026-01-01T00:00:00+00:00 \
+    --upto=2026-01-31T23:59:59+00:00 \
+    --limit=1000
+```
+
+> **Wrong combination** — `--since` after `--upto` (inverted window, saves 0 messages):
+>
+> ```
+> python3 telegram-cli.pyz backup -1001234567890 \
+>     --since=2026-02-01T00:00:00+00:00 \
+>     --upto=2026-01-01T00:00:00+00:00
+> ```
+>
+> There are no messages that are both **after** Feb 1 and **on or before** Jan 1. The backup saves 0 messages. Always verify that `--since` is an earlier date than `--upto`.
+
+Example — custom hierarchy depth with `--split_threshold` (split into monthly directories when a bucket exceeds 20 messages):
+
+```
+python3 telegram-cli.pyz backup -1001234567890 --split_threshold=20
+```
+
 Example — backup messages and photos:
 
 ```

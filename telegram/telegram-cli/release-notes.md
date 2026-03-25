@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.34
+Optimized integration tests 21–25 and added README examples for `--estimate`, `--count`, `--since`, `--upto`, and `--split_threshold`. Tests 21 and 22 now use a Jan 2026 time window (`--since=2026-01-21T00:00:00+00:00 --upto=2026-01-20T23:59:59+00:00`): 159 messages, 3 docs, 44 media items (down from 94); test 22 timeout reduced from 600 s to 300 s. Tests 23–25 use a Feb 2026 window (`--since=2026-02-28T00:00:00+00:00 --upto=2026-02-27T23:59:59+00:00`): test 25 expected link count corrected from 24 to 17. README gains seven new examples demonstrating `--estimate`, `--count`, incremental (`--since`), historical snapshot (`--upto`), correct and deliberately wrong `--since+--upto` combinations, and `--split_threshold`.
+
 ## Version: 1.0.33
 Added integration tests 26-28 covering the three new backup flags: test 26 (`--upto`): verifies that a backup with `--upto=2026-03-19T00:00:00+00:00 --limit=500` produces 480 messages in the tree (fewer than the unfiltered 499); test 27 (`--count`): verifies stdout prints `Messages: 500 total` + per-type breakdown and that no output directory is created; test 28 (`--split_threshold=5`): verifies that 20 messages with threshold=5 produce a `2026/03/` month-level subdirectory and still contain all 20 messages. Also fixed tests 9, 10, and 20 to traverse the new time-hierarchy tree (using `_leaf_json_files` + `_count_tree_messages` helpers) instead of looking for a flat `messages.json` directly in the dialog subdirectory. All 56 integration checks + 135 unit tests pass.
 

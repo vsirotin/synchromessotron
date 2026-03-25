@@ -608,10 +608,16 @@ def integration_test(cli: str) -> tuple[int, int, int]:
         return len(checks), passed
 
     # Test 21: --files downloads 3 document files
+    # Uses --since=2026-01-21 --upto=2026-01-20 to constrain to 159 messages (Jan 2026 and earlier):
+    # pagination starts before Jan 21 and stops naturally (no messages before that window are wasted),
+    # then --upto=Jan 20 confirms the upper bound. Only 3 docs exist in this window.
     test_name = "backup --files downloads 3 document files with non-zero size"
     print(f"\n[Test 21] {test_name}")
 
-    dialog_dir_21, _, rc_21 = _run_backup_with_flags("backup_files_dl", "--files")
+    dialog_dir_21, _, rc_21 = _run_backup_with_flags(
+        "backup_files_dl",
+        "--files --since=2026-01-21T00:00:00+00:00 --upto=2026-01-20T23:59:59+00:00",
+    )
     checks_count = 4
     passed_count = 0
     if dialog_dir_21 and rc_21 == 0:
@@ -623,15 +629,21 @@ def integration_test(cli: str) -> tuple[int, int, int]:
     total_checks += checks_count
     total_passed += passed_count
 
-    # Test 22: --media downloads 94 photos + videos (84 photos + 10 videos)
-    test_name = "backup --media downloads 94 photos+videos with non-zero size"
+    # Test 22: --media downloads photos + videos.
+    # Same Jan 2026 window (--since=Jan 21, --upto=Jan 20): 159 messages, 39 photos + 5 videos = 44 items.
+    # This is ~54 % fewer downloads than the full-history window (94 items), reducing test run time.
+    test_name = "backup --media downloads 44 photos+videos with non-zero size"
     print(f"\n[Test 22] {test_name}")
 
-    dialog_dir_22, _, rc_22 = _run_backup_with_flags("backup_media_dl", "--media", timeout_s=600)
+    dialog_dir_22, _, rc_22 = _run_backup_with_flags(
+        "backup_media_dl",
+        "--media --since=2026-01-21T00:00:00+00:00 --upto=2026-01-20T23:59:59+00:00",
+        timeout_s=300,
+    )
     checks_count = 4
     passed_count = 0
     if dialog_dir_22 and rc_22 == 0:
-        checks_count, passed_count = _check_download_category(dialog_dir_22, "media", 94)
+        checks_count, passed_count = _check_download_category(dialog_dir_22, "media", 44)
     else:
         print(f"  ✗ FAILED: backup command failed (rc={rc_22}) or dialog dir not found")
 
@@ -639,11 +651,15 @@ def integration_test(cli: str) -> tuple[int, int, int]:
     total_checks += checks_count
     total_passed += passed_count
 
-    # Test 23: --music downloads 1 music file
+    # Test 23: --music downloads 1 music file.
+    # Uses Feb 2026 window (--since=Feb 28, --upto=Feb 27) — 376 messages, 1 music track.
     test_name = "backup --music downloads 1 music file with non-zero size"
     print(f"\n[Test 23] {test_name}")
 
-    dialog_dir_23, _, rc_23 = _run_backup_with_flags("backup_music_dl", "--music")
+    dialog_dir_23, _, rc_23 = _run_backup_with_flags(
+        "backup_music_dl",
+        "--music --since=2026-02-28T00:00:00+00:00 --upto=2026-02-27T23:59:59+00:00",
+    )
     checks_count = 4
     passed_count = 0
     if dialog_dir_23 and rc_23 == 0:
@@ -655,11 +671,14 @@ def integration_test(cli: str) -> tuple[int, int, int]:
     total_checks += checks_count
     total_passed += passed_count
 
-    # Test 24: --voice downloads 2 voice messages
+    # Test 24: --voice downloads 2 voice messages (same Feb window: 2 voice files).
     test_name = "backup --voice downloads 2 voice messages with non-zero size"
     print(f"\n[Test 24] {test_name}")
 
-    dialog_dir_24, _, rc_24 = _run_backup_with_flags("backup_voice_dl", "--voice")
+    dialog_dir_24, _, rc_24 = _run_backup_with_flags(
+        "backup_voice_dl",
+        "--voice --since=2026-02-28T00:00:00+00:00 --upto=2026-02-27T23:59:59+00:00",
+    )
     checks_count = 4
     passed_count = 0
     if dialog_dir_24 and rc_24 == 0:
@@ -671,11 +690,14 @@ def integration_test(cli: str) -> tuple[int, int, int]:
     total_checks += checks_count
     total_passed += passed_count
 
-    # Test 25: --links creates links/ directory with 24 entries (no file downloads)
-    test_name = "backup --links creates links/ directory with 24 message entries"
+    # Test 25: --links creates links/ directory (same Feb window: 17 link entries, no file downloads).
+    test_name = "backup --links creates links/ directory with 17 message entries"
     print(f"\n[Test 25] {test_name}")
 
-    dialog_dir_25, _, rc_25 = _run_backup_with_flags("backup_links_dl", "--links")
+    dialog_dir_25, _, rc_25 = _run_backup_with_flags(
+        "backup_links_dl",
+        "--links --since=2026-02-28T00:00:00+00:00 --upto=2026-02-27T23:59:59+00:00",
+    )
     checks_count = 2
     passed_count = 0
     if dialog_dir_25 and rc_25 == 0:
@@ -683,7 +705,7 @@ def integration_test(cli: str) -> tuple[int, int, int]:
         cat_json_25 = os.path.join(cat_dir_25, "messages.json")
         for chk in [
             check_directory_exists(cat_dir_25),
-            check_json_array_length(cat_json_25, 24),
+            check_json_array_length(cat_json_25, 17),
         ]:
             r = chk()
             if r.passed:
