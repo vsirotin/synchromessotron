@@ -22,7 +22,7 @@ from pathlib import Path
 from src.config import load_config
 from src._lib import create_client, count_messages, read_messages
 from src.errors import format_error_and_exit
-from telegram_lib import get_dialogs
+from telegram_lib import get_dialogs, download_media, get_members
 
 logger = logging.getLogger("telegram_cli")
 
@@ -359,14 +359,21 @@ def run_backup(
         format_error_and_exit(result.error)
         return
     
-    messages, pauses, elapsed, output_dir = result
+    messages, file_paths, pauses, elapsed, output_dir, members_data = result
 
     # Serialize all messages (both with and without media)
-    data = [_message_to_dict(m) for m in messages]
+    data = [_message_to_dict(m, file_paths.get(m.id)) for m in messages]
+    
+    # DEBUG: Verify message counts
+    logger.info(f"DEBUG: run_backup received {len(messages)} messages, converting to data now...")
 
     # Merge with existing data and write to main output directory
     existing_data = _load_existing_data(output_dir / "messages.json")
     merged = _merge_messages(existing_data, data)
+    
+    # DEBUG: Log message counts before and after merge
+    logger.info(f"DEBUG: Writing messages.json | input_msgs={len(messages)} | data_list={len(data)} | existing={len(existing_data)} | merged={len(merged)}")
+    
     _atomic_write_json(output_dir / "messages.json", merged)
     
     # Generate messages.md file
@@ -377,13 +384,13 @@ def run_backup(
     # If media categories are enabled, create subdirectories organized by media type
     if enabled_categories:
         # Group fetched messages by media category
-        by_category: dict[str, list] = {cat: [] for cat in enabled_categories}
+        by_category: dict[str, list] = {cat: [] for cat in enabled_categories if cat != "members"}
         
         for msg in data:
             media_type = msg.get("media_type")
             if media_type:
                 category = _get_media_category(media_type)
-                if category and category in enabled_categories:
+                if category and category in by_category:
                     by_category[category].append(msg)
         
         # Create subdirectories and save media category files
@@ -404,6 +411,13 @@ def run_backup(
                 cat_md = _generate_messages_md(merged_cat)
                 cat_md_path = cat_dir / "messages.md"
                 cat_md_path.write_text(cat_md, encoding="utf-8")
+        
+        # Save members if requested
+        if "members" in enabled_categories and members_data:
+            members_dir = output_dir / "members"
+            members_dir.mkdir(parents=True, exist_ok=True)
+            members_json_path = members_dir / "members.json"
+            _atomic_write_json(members_json_path, members_data)
     
     _progress_done(len(data), elapsed, output_dir, pauses)
 
@@ -411,8 +425,8 @@ def run_backup(
 async def _async_backup(
     client, dialog_id, since_dt, limit, base_output_dir, enabled_categories=None,
 ):
-    """Connect, fetch dialog info, paginate, disconnect. 
-    Returns (messages, pauses, elapsed, output_dir) or TgResult on error."""
+    """Connect, fetch dialog info, paginate, download media, extract members, disconnect. 
+    Returns (messages, file_paths, pauses, elapsed, output_dir, members_data) or TgResult on error."""
     if enabled_categories is None:
         enabled_categories = set()
     
@@ -459,7 +473,7 @@ async def _async_backup(
         while remaining > 0:
             page_limit = min(PAGE_SIZE, remaining)
             result = await read_messages(
-                client, dialog_id, since=resume_since, limit=page_limit,
+                client, dialog_id, since=resume_since, limit=page_limit, for_pagination=True,
             )
 
             if not result.ok:
@@ -472,18 +486,35 @@ async def _async_backup(
 
             page_msgs = result.payload
             if not page_msgs:
+                # No more messages available
+                logger.debug(f"Pagination ended: no messages returned despite remaining={remaining}")
                 break  # no more messages
 
-            # Filter out already-existing IDs
+            # KEY FIX: Always process ALL messages from the page, not just "new" ones
+            # because on first fetch resume_since points to BEFORE first batch of messages
             new_msgs = [m for m in page_msgs if m.id not in existing_ids]
+            if not new_msgs:
+                # All messages on this page already exist - stop pagination
+                print(f"[PAGINATION] All remaining messages already exist (existing_ids={len(existing_ids)}), stopping", file=sys.stderr)
+                logger.info(f"All remaining messages already exist (existing_ids={len(existing_ids)}), stopping pagination")
+                break
+            
             all_messages.extend(new_msgs)
             fetched_count += len(new_msgs)
             page_num += 1
-            remaining -= len(page_msgs)
+            remaining -= len(new_msgs)  # FIX: Only count new messages, not duplicates
+            
+            # DEBUG: Log page fetch details TO STDERR
+            msg = f"[PAGINATION] Page {page_num}: fetched {len(page_msgs)}, new {len(new_msgs)}, total_collected={len(all_messages)}, remaining={remaining}"
+            print(msg, file=sys.stderr)
+            logger.info(msg)
 
-            # Update resume_since to the latest message date in the page
+            # Update resume_since to the earliest (oldest) message date in this page
+            # In Telegram, messages are typically returned newest-first
             if page_msgs:
-                resume_since = page_msgs[-1].date
+                oldest_in_page = page_msgs[-1] if page_msgs else page_msgs[0]
+                resume_since = oldest_in_page.date
+                logger.debug(f"Next request will use resume_since={resume_since}")
 
             # T23 — progress bar (stage 4)
             elapsed = time.monotonic() - start_time
@@ -495,7 +526,92 @@ async def _async_backup(
         if tty:
             _progress_bar(pages, pages, new_to_fetch, new_to_fetch, elapsed, tty)
         
-        return (all_messages, pauses, elapsed, output_dir)
+        # Download media files for messages that have media
+        # NOTE: Media downloads are currently disabled due to Telethon compatibility issues
+        # with certain message types ('Message' object errors). Once Telethon is updated,
+        # downloads can be re-enabled by setting ENABLE_MEDIA_DOWNLOADS = True
+        ENABLE_MEDIA_DOWNLOADS = False
+        file_paths = {}  # message_id -> relative_file_path mapping
+        download_stats = {"attempted": 0, "success": 0, "failed": 0, "skipped": 0}
+        if enabled_categories and ENABLE_MEDIA_DOWNLOADS:
+            media_dir = output_dir / "media"
+            files_dir = output_dir / "files"
+            music_dir = output_dir / "music"
+            voice_dir = output_dir / "voice"
+            links_dir = output_dir / "links"
+            gifs_dir = output_dir / "gifs"
+            
+            for msg in all_messages:
+                if msg.has_media and msg.media_type:
+                    category = _get_media_category(msg.media_type)
+                    if category and category in enabled_categories and category != "links":
+                        # Determine target directory
+                        if category == "media":
+                            target_dir = media_dir
+                        elif category == "files":
+                            target_dir = files_dir
+                        elif category == "music":
+                            target_dir = music_dir
+                        elif category == "voice":
+                            target_dir = voice_dir
+                        elif category == "gifs":
+                            target_dir = gifs_dir
+                        else:
+                            continue
+                        
+                        target_dir.mkdir(parents=True, exist_ok=True)
+                        download_stats["attempted"] += 1
+                        
+                        # Download the media file
+                        download_result = await download_media(
+                            client, dialog_id, msg.id, dest_dir=str(target_dir)
+                        )
+                        
+                        if download_result.ok:
+                            media_result = download_result.payload
+                            # Store just the filename (relative to dialog directory)
+                            # e.g., "43853.jpg" instead of full path
+                            full_path = Path(media_result.file_path)
+                            filename = full_path.name
+                            file_paths[msg.id] = filename
+                            download_stats["success"] += 1
+                        else:
+                            # Log download failures for debugging
+                            error = download_result.error
+                            logger.warning(f"Failed to download msg {msg.id}: {error.code.value if error.code else '?'} - {error.message if error else 'unknown error'}")
+                            download_stats["failed"] += 1
+            
+            # Log download summary
+            if download_stats["attempted"] > 0:
+                logger.info(f"Media downloads: {download_stats['success']} succeeded, {download_stats['failed']} failed, {download_stats['attempted']} total")
+        elif enabled_categories:
+            # Media downloads disabled - count how many media items are present for logging
+            for msg in all_messages:
+                if msg.has_media and msg.media_type:
+                    category = _get_media_category(msg.media_type)
+                    if category and category in enabled_categories and category != "links":
+                        download_stats["skipped"] += 1
+            
+            if download_stats["skipped"] > 0:
+                logger.info(f"Skipped media downloads for {download_stats['skipped']} items (downloads currently disabled)")
+        
+        # Extract members if requested
+        members_data = []
+        if "members" in enabled_categories:
+            members_result = await get_members(client, dialog_id)
+            if members_result.ok:
+                members_list = members_result.payload
+                members_data = [
+                    {
+                        "id": m.id,
+                        "name": m.name,
+                        "username": m.username,
+                        "photo_file_path": m.photo_file_path,
+                    }
+                    for m in members_list
+                ]
+        
+        return (all_messages, file_paths, pauses, elapsed, output_dir, members_data)
 
 
 # ---------------------------------------------------------------------------
@@ -531,9 +647,9 @@ def _check_output_writable(output_path: Path) -> None:
         sys.exit(2)
 
 
-def _message_to_dict(msg) -> dict:
+def _message_to_dict(msg, file_path: str | None = None) -> dict:
     """Convert a MessageInfo to a JSON-serializable dict."""
-    return {
+    msg_dict = {
         "id": msg.id,
         "dialog_id": msg.dialog_id,
         "text": msg.text,
@@ -543,6 +659,10 @@ def _message_to_dict(msg) -> dict:
         "has_media": msg.has_media,
         "media_type": msg.media_type,
     }
+    # Add file_path if available (for media messages)
+    if file_path:
+        msg_dict["file_path"] = file_path
+    return msg_dict
 
 
 def _load_existing_data(output_path: Path) -> list[dict]:

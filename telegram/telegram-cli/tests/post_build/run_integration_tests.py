@@ -152,10 +152,11 @@ class IntegrationTestRunner:
         
         try:
             # Run tests from dist/ directory where config.yaml is expected
-            result = subprocess.run(cmd, cwd=str(self.dist_dir), env=env, timeout=120)
+            # Tests 19-20 require 180s each for backup operations + overhead
+            result = subprocess.run(cmd, cwd=str(self.dist_dir), env=env, timeout=600)
             sys.exit(result.returncode)
         except subprocess.TimeoutExpired:
-            print(f"\n✗ Tests timed out (120s)")
+            print(f"\n✗ Tests timed out (600s)")
             sys.exit(1)
         except Exception as e:
             print(f"\n✗ Error running tests: {e}")

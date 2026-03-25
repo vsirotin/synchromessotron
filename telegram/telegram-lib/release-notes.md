@@ -1,5 +1,8 @@
 # Project telegram/telegram-lib. Release notes 
 
+## Version: 1.2.5
+Enhanced `read_messages()` function to support dual-mode operation for pagination and incremental backup: (1) Added `for_pagination: bool = False` parameter to function signature; (2) When `for_pagination=True`, date filtering is disabled, allowing Telethon's `offset_date` parameter to properly handle message boundary dates according to Telegram API behavior; (3) When `for_pagination=False` (incremental backup mode), date filtering `msg.date <= since` is applied as before; (4) This fix resolves pagination issue where Telethon's `get_messages(offset_date=date, reverse=True)` returns messages INCLUDING the boundary date, but the filter was rejecting them, causing pagination to stall; (5) Backward compatible: existing callers not using pagination continue to work with default `for_pagination=False`; (6) Verified with backup command: --limit=200 now downloads 3 pages (100 + 99 + 1 messages) instead of stopping at first page; (7) Updated function docstring to explain dual-mode behavior and difference between pagination and incremental backup modes.
+
 ## Version: 1.2.4
 Updated workspace pyproject.toml configuration: added `[tool.workspace.projects]` section to track sub-project dependencies (telegram-lib, telegram-cli), cleaned up outdated root-level dependencies (firebase-admin, pydantic, Telethon, vk_api), and updated ruff configuration. Enhanced post-task skill to use workspace configuration for dependency discovery. All 51 tests pass.
 

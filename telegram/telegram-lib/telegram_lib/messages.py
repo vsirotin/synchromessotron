@@ -51,18 +51,23 @@ async def read_messages(
     *,
     since: datetime | None = None,
     limit: int = 100,
+    for_pagination: bool = False,
 ) -> TgResult[list[MessageInfo]]:
     """Read messages from a dialog, optionally since a given timestamp (F1).
 
-    When *since* is provided only messages strictly **after** that timestamp
-    are returned (incremental backup).  When omitted the most recent *limit*
-    messages are returned (full history page).
+    When *since* is provided and for_pagination=False (incremental backup),
+    only messages strictly **after** that timestamp are returned.
+    When for_pagination=True, *since* is used as offset_date for Telethon,
+    and NO date filtering is applied (Telethon handles the boundary).
+    When omitted the most recent *limit* messages are returned (full history page).
 
     Args:
         client: An authenticated ``TelegramClient``.
         dialog_id: Numeric dialog ID or string handle (e.g. ``"me"``).
-        since: If set, only return messages posted after this timestamp.
+        since: If set, only return messages posted after this timestamp (incremental mode)
+               or use as pagination offset (pagination mode).
         limit: Maximum number of messages to return per call.
+        for_pagination: If True, *since* is used as offset_date and no filtering is applied.
 
     Returns:
         ``TgResult`` whose payload is a list of ``MessageInfo``.
@@ -86,7 +91,8 @@ async def read_messages(
         result: list[MessageInfo] = []
         peer_id = _resolve_peer_id(entity)
         for msg in raw_messages:
-            if since and msg.date <= since:
+            # Only apply date filter in incremental mode (not for pagination)
+            if not for_pagination and since and msg.date <= since:
                 continue
             result.append(_to_message_info(msg, peer_id))
         return TgResult(payload=result)

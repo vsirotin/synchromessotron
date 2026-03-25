@@ -162,6 +162,22 @@ Data is organized hierarchically under `--outdir` (default: `./synchromessotron`
     └── members/                      (if --members flag used)
 ```
 
+**Content in media subdirectories:**
+
+Each media subdirectory (`media/`, `files/`, `music/`, `voice/`, `links/`, `gifs/`) contains:
+- **messages.json:** List of messages with media, with each entry containing message metadata and a `file_path` field pointing to the downloaded media file (named by message ID, e.g., `43853.jpg`, `44280.mp4`).
+- **messages.md:** Human-readable markdown representation of media messages (author, timestamp, text, [MEDIA] indicator).
+- **Downloaded files:** Actual media files organized by message ID.
+
+**Members subdirectory:**
+
+The `members/` subdirectory (when `--members` flag used) contains:
+- **members.json:** Single file with list of dialog participants. Each entry contains basic member info (id, name, username, and optional photo_file_path).
+
+**Chronological ordering:**
+
+All entries in `*.json` and `*.md` files are stored in chronological order (oldest first).
+
 Splitting decisions (controlled by `split_threshold` in `config.yaml`, default: 50):
 - **Year** directory always created.
 - If year > threshold → create **month** subdirectories.
