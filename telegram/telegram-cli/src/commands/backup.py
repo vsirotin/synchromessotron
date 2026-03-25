@@ -155,6 +155,26 @@ def _progress_bar(current_page, total_pages, fetched, total, elapsed, tty):
         print(line)
 
 
+def _progress_bar_files(fetched: int, total: int, elapsed: float, tty: bool) -> None:
+    """Print a progress bar for file downloads (mirrors _progress_bar)."""
+    if total == 0:
+        pct = 100
+    else:
+        pct = min(100, int(fetched / total * 100))
+    bar_len = 16
+    filled = int(bar_len * pct / 100)
+    bar = "\u2588" * filled + "\u2591" * (bar_len - filled)
+    remaining_s = (elapsed / max(fetched, 1)) * (total - fetched) if fetched else 0
+    line = (
+        f"[{bar}] {pct}% | {fetched}/{total} files"
+        f" | {_fmt_time(elapsed)} elapsed | \u2248 {_fmt_time(remaining_s)} left"
+    )
+    if tty:
+        print(f"\r{line}", end="", flush=True)
+    else:
+        print(line)
+
+
 def _progress_done(total_downloaded, elapsed, output_dir, pauses):
     """Stage 5 — print final report."""
     if _is_tty():
@@ -515,68 +535,61 @@ async def _async_backup(
         # Download media files for messages that have media
         ENABLE_MEDIA_DOWNLOADS = True
         file_paths = {}  # message_id -> relative_file_path mapping
-        download_stats = {"attempted": 0, "success": 0, "failed": 0, "skipped": 0}
+        download_stats = {"attempted": 0, "success": 0, "failed": 0}
         if enabled_categories and ENABLE_MEDIA_DOWNLOADS:
-            media_dir = output_dir / "media"
-            files_dir = output_dir / "files"
-            music_dir = output_dir / "music"
-            voice_dir = output_dir / "voice"
-            links_dir = output_dir / "links"
-            gifs_dir = output_dir / "gifs"
-            
+            _CAT_DIR = {
+                "media": output_dir / "media",
+                "files": output_dir / "files",
+                "music": output_dir / "music",
+                "voice": output_dir / "voice",
+                "gifs": output_dir / "gifs",
+            }
+            # Collect list of (msg, category, target_dir) to download
+            to_download = []
             for msg in all_messages:
                 if msg.has_media and msg.media_type:
                     category = _get_media_category(msg.media_type)
-                    if category and category in enabled_categories and category != "links":
-                        # Determine target directory
-                        if category == "media":
-                            target_dir = media_dir
-                        elif category == "files":
-                            target_dir = files_dir
-                        elif category == "music":
-                            target_dir = music_dir
-                        elif category == "voice":
-                            target_dir = voice_dir
-                        elif category == "gifs":
-                            target_dir = gifs_dir
-                        else:
-                            continue
-                        
-                        target_dir.mkdir(parents=True, exist_ok=True)
-                        download_stats["attempted"] += 1
-                        
-                        # Download the media file
-                        download_result = await download_media(
-                            client, dialog_id, msg.id, dest_dir=str(target_dir)
+                    if category and category in enabled_categories and category in _CAT_DIR:
+                        to_download.append((msg, _CAT_DIR[category]))
+
+            total_files = len(to_download)
+            if total_files > 0:
+                print(f"Downloading files: {total_files} total.")
+                dl_start = time.monotonic()
+                for i, (msg, target_dir) in enumerate(to_download, 1):
+                    target_dir.mkdir(parents=True, exist_ok=True)
+                    download_stats["attempted"] += 1
+
+                    download_result = await download_media(
+                        client, dialog_id, msg.id, dest_dir=str(target_dir)
+                    )
+
+                    if download_result.ok:
+                        media_result = download_result.payload
+                        full_path = Path(media_result.file_path)
+                        file_paths[msg.id] = full_path.name
+                        download_stats["success"] += 1
+                    else:
+                        error = download_result.error
+                        logger.warning(
+                            f"Failed to download msg {msg.id}: "
+                            f"{error.code.value if error.code else '?'} - "
+                            f"{error.message if error else 'unknown error'}"
                         )
-                        
-                        if download_result.ok:
-                            media_result = download_result.payload
-                            # Store just the filename (relative to dialog directory)
-                            # e.g., "43853.jpg" instead of full path
-                            full_path = Path(media_result.file_path)
-                            filename = full_path.name
-                            file_paths[msg.id] = filename
-                            download_stats["success"] += 1
-                        else:
-                            # Log download failures for debugging
-                            error = download_result.error
-                            logger.warning(f"Failed to download msg {msg.id}: {error.code.value if error.code else '?'} - {error.message if error else 'unknown error'}")
-                            download_stats["failed"] += 1
-            
-            # Log download summary
-            if download_stats["attempted"] > 0:
-                logger.info(f"Media downloads: {download_stats['success']} succeeded, {download_stats['failed']} failed, {download_stats['attempted']} total")
-        elif enabled_categories:
-            # Media downloads disabled - count how many media items are present for logging
-            for msg in all_messages:
-                if msg.has_media and msg.media_type:
-                    category = _get_media_category(msg.media_type)
-                    if category and category in enabled_categories and category != "links":
-                        download_stats["skipped"] += 1
-            
-            if download_stats["skipped"] > 0:
-                logger.info(f"Skipped media downloads for {download_stats['skipped']} items (downloads currently disabled)")
+                        download_stats["failed"] += 1
+
+                    dl_elapsed = time.monotonic() - dl_start
+                    _progress_bar_files(i, total_files, dl_elapsed, tty)
+
+                if tty:
+                    # Show final bar then move to new line
+                    dl_elapsed = time.monotonic() - dl_start
+                    _progress_bar_files(total_files, total_files, dl_elapsed, tty)
+                    print()
+                logger.info(
+                    f"File downloads: {download_stats['success']} ok, "
+                    f"{download_stats['failed']} failed, {total_files} total"
+                )
         
         # Extract members if requested
         members_data = []

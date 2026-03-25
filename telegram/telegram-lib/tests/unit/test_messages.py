@@ -48,6 +48,7 @@ def _mock_client():
 # _get_media_type helper
 # -----------------------------------------------------------------------
 
+
 class TestGetMediaType:
     """Unit tests for the _get_media_type helper."""
 
