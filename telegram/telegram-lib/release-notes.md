@@ -1,5 +1,8 @@
 # Project telegram/telegram-lib. Release notes 
 
+## Version: 1.2.8
+Added `_get_media_type()` helper to `messages.py` that returns a semantic media type string ("photo", "video", "audio", "voice", "gif", "document", "webpage") from a Telethon media object by inspecting `DocumentAttribute*` attrs instead of using the raw class name. Updated `_to_message_info()` to use this helper so `MessageInfo.media_type` is now a semantic string rather than a Telethon class name (e.g. "video" instead of "MessageMediaDocument"). Fixed critical bug in `download_media()`: `client.get_messages(entity, ids=message_id)` was called with a scalar int, causing Telethon to return a single `Message` object that is not subscriptable; changed to `ids=[message_id]` so a list is always returned. Added 8 unit tests for `_get_media_type` (covering photo, video, audio, voice, gif, document, webpage, None) and 1 regression test for the `ids` list fix. All 61 tests pass, `ruff check` clean.
+
 ## Version: 1.2.7
 Fixed 13 ruff lint errors in `media.py` and `members.py` that caused CI to fail: removed whitespace-only blank lines (W293), removed trailing whitespace (W291), replaced unused exception variable bindings `except TypeError as e` / `except Exception as e` with bare form or renamed to `exc` (F841), replaced bare `except:` with `except Exception:` (E722). All 52 tests pass, `ruff check` clean.
 

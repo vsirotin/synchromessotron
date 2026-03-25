@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import telethon.tl.types as _tl
 from telethon import TelegramClient
 
 from telegram_lib._logging import logged
@@ -18,6 +19,40 @@ from telegram_lib.models import ErrorCode, MessageInfo, TgError, TgResult
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _get_media_type(media) -> str | None:
+    """Return a semantic media type string for a Telethon media object.
+
+    Returns one of: "photo", "video", "audio", "voice", "gif", "document",
+    "webpage", or None if *media* is None.  Falls back to the class name for
+    unknown types so callers always get a non-empty string when media exists.
+    """
+    if media is None:
+        return None
+
+    if isinstance(media, _tl.MessageMediaPhoto):
+        return "photo"
+
+    if isinstance(media, _tl.MessageMediaDocument):
+        doc = media.document
+        if doc and hasattr(doc, "attributes"):
+            for attr in doc.attributes:
+                if isinstance(attr, _tl.DocumentAttributeVideo):
+                    return "video"
+                if isinstance(attr, _tl.DocumentAttributeAudio):
+                    if getattr(attr, "voice", False):
+                        return "voice"
+                    return "audio"
+                if isinstance(attr, _tl.DocumentAttributeAnimated):
+                    return "gif"
+        return "document"
+
+    if isinstance(media, _tl.MessageMediaWebPage):
+        return "webpage"
+
+    # Fallback: preserve class name for unknown / future Telethon types
+    return type(media).__name__
 
 
 def _to_message_info(msg, dialog_id: int) -> MessageInfo:
@@ -35,7 +70,7 @@ def _to_message_info(msg, dialog_id: int) -> MessageInfo:
         sender_id=sender_id,
         sender_name=sender_name,
         has_media=msg.media is not None,
-        media_type=type(msg.media).__name__ if msg.media else None,
+        media_type=_get_media_type(msg.media),
     )
 
 

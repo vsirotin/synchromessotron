@@ -135,3 +135,35 @@ class TestDownloadMedia:
 
         assert not result.ok
         assert result.error.code == ErrorCode.INTERNAL_ERROR
+
+    @pytest.mark.asyncio
+    async def test_download_media_requests_list_ids(self):
+        """get_messages must be called with ids=[message_id] (a list), not ids=message_id.
+
+        Telethon returns a single Message object when ids is an integer, which is
+        not subscriptable ('Message' object is not subscriptable).  Passing a list
+        forces Telethon to return a list even for a single ID.
+        """
+        from telegram_lib.media import download_media
+
+        fake_file_path = "/tmp/voice_42389.ogg"
+        media_mock = MagicMock()
+        media_mock.mime_type = "audio/ogg"
+        msg = _make_tg_msg(msg_id=42389, media=media_mock)
+
+        client = _mock_client()
+        client.get_entity = AsyncMock(return_value=_mock_entity())
+        client.get_messages = AsyncMock(return_value=[msg])
+        client.download_media = AsyncMock(return_value=fake_file_path)
+
+        await download_media(client, 123, 42389)
+
+        call_kwargs = client.get_messages.call_args
+        ids_arg = call_kwargs.kwargs.get("ids") or (
+            call_kwargs.args[1] if len(call_kwargs.args) > 1 else None
+        )
+        assert isinstance(ids_arg, list), (
+            "get_messages must be called with ids=[message_id] (a list). "
+            "Telethon returns a plain Message object for a scalar ids arg, "
+            "causing 'Message' object is not subscriptable on messages[0]."
+        )

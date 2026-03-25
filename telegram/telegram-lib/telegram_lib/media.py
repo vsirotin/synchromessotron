@@ -49,7 +49,7 @@ async def download_media(
     """
     try:
         entity = await client.get_entity(dialog_id)
-        messages = await client.get_messages(entity, ids=message_id)
+        messages = await client.get_messages(entity, ids=[message_id])
         if not messages or not messages[0]:
             return TgResult(
                 error=TgError(ErrorCode.ENTITY_NOT_FOUND, f"Message {message_id} not found")

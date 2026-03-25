@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import telethon.tl.types as tl_types
 
 from telegram_lib.models import ErrorCode
 
@@ -41,6 +42,83 @@ def _mock_client():
     client = AsyncMock()
     client.is_connected.return_value = True
     return client
+
+
+# -----------------------------------------------------------------------
+# _get_media_type helper
+# -----------------------------------------------------------------------
+
+class TestGetMediaType:
+    """Unit tests for the _get_media_type helper."""
+
+    def test_none_returns_none(self):
+        from telegram_lib.messages import _get_media_type
+
+        assert _get_media_type(None) is None
+
+    def test_photo(self):
+        from telegram_lib.messages import _get_media_type
+
+        media = MagicMock(spec=tl_types.MessageMediaPhoto)
+        assert _get_media_type(media) == "photo"
+
+    def test_document_video(self):
+        from telegram_lib.messages import _get_media_type
+
+        attr_video = MagicMock(spec=tl_types.DocumentAttributeVideo)
+        doc = MagicMock()
+        doc.attributes = [attr_video]
+        media = MagicMock(spec=tl_types.MessageMediaDocument)
+        media.document = doc
+        assert _get_media_type(media) == "video"
+
+    def test_document_audio_music(self):
+        from telegram_lib.messages import _get_media_type
+
+        attr_audio = MagicMock(spec=tl_types.DocumentAttributeAudio)
+        attr_audio.voice = False
+        doc = MagicMock()
+        doc.attributes = [attr_audio]
+        media = MagicMock(spec=tl_types.MessageMediaDocument)
+        media.document = doc
+        assert _get_media_type(media) == "audio"
+
+    def test_document_audio_voice(self):
+        from telegram_lib.messages import _get_media_type
+
+        attr_audio = MagicMock(spec=tl_types.DocumentAttributeAudio)
+        attr_audio.voice = True
+        doc = MagicMock()
+        doc.attributes = [attr_audio]
+        media = MagicMock(spec=tl_types.MessageMediaDocument)
+        media.document = doc
+        assert _get_media_type(media) == "voice"
+
+    def test_document_animated_gif(self):
+        from telegram_lib.messages import _get_media_type
+
+        attr_animated = MagicMock(spec=tl_types.DocumentAttributeAnimated)
+        doc = MagicMock()
+        doc.attributes = [attr_animated]
+        media = MagicMock(spec=tl_types.MessageMediaDocument)
+        media.document = doc
+        assert _get_media_type(media) == "gif"
+
+    def test_document_generic(self):
+        from telegram_lib.messages import _get_media_type
+
+        attr_filename = MagicMock(spec=tl_types.DocumentAttributeFilename)
+        doc = MagicMock()
+        doc.attributes = [attr_filename]
+        media = MagicMock(spec=tl_types.MessageMediaDocument)
+        media.document = doc
+        assert _get_media_type(media) == "document"
+
+    def test_webpage(self):
+        from telegram_lib.messages import _get_media_type
+
+        media = MagicMock(spec=tl_types.MessageMediaWebPage)
+        assert _get_media_type(media) == "webpage"
 
 
 # -----------------------------------------------------------------------

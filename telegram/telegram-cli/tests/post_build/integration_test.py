@@ -27,6 +27,8 @@ from .check_output_json import (
     check_json_contains_element,
     check_directory_exists,
     check_file_exists,
+    check_json_all_elements_have_key,
+    check_files_referenced_in_json_exist,
 )
 from .check_stdout import (
     check_stdout_contains,
@@ -548,7 +550,135 @@ def integration_test(cli: str) -> tuple[int, int, int]:
     total_tests += 1
     total_checks += checks_count
     total_passed += passed_count
-    
+
+    # -----------------------------------------------------------------------
+    # Tests 21-25: Media / file downloading (requires --media / --files /
+    # --music / --voice / --links flags and ENABLE_MEDIA_DOWNLOADS = True)
+    # -----------------------------------------------------------------------
+
+    # Helper: run a backup with given flags, return (dialog_dir_path, stdout, returncode)
+    def _run_backup_with_flags(outdir: str, flags: str, timeout_s: int = 300):
+        if os.path.exists(outdir):
+            shutil.rmtree(outdir)
+        cmd = f"{cli} backup -4821106881 --limit=500 {flags} --outdir={outdir}"
+        print(f"\n  Running: {cmd}")
+        proc = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout_s)
+        matched = glob.glob(os.path.join(outdir, "*_-4821106881"))
+        dialog_dir = matched[0] if matched else None
+        return dialog_dir, proc.stdout, proc.returncode
+
+    # Helper: run standard checks for a download category
+    def _check_download_category(dialog_dir, category: str, expected_msg_count: int):
+        """Return (checks_count, passed_count) for a downloaded category."""
+        cat_dir = os.path.join(dialog_dir, category)
+        cat_json = os.path.join(cat_dir, "messages.json")
+        checks = [
+            check_directory_exists(cat_dir),
+            check_json_array_length(cat_json, expected_msg_count),
+            check_json_all_elements_have_key(cat_json, "file_path"),
+            check_files_referenced_in_json_exist(cat_json, cat_dir),
+        ]
+        passed = 0
+        for chk in checks:
+            result = chk()
+            if result.passed:
+                passed += 1
+                print(f"    ✓ {result.message}")
+            else:
+                print(f"  ✗ FAILED: {result.message}")
+        return len(checks), passed
+
+    # Test 21: --files downloads 3 document files
+    test_name = "backup --files downloads 3 document files with non-zero size"
+    print(f"\n[Test 21] {test_name}")
+
+    dialog_dir_21, _, rc_21 = _run_backup_with_flags("backup_files_dl", "--files")
+    checks_count = 4
+    passed_count = 0
+    if dialog_dir_21 and rc_21 == 0:
+        checks_count, passed_count = _check_download_category(dialog_dir_21, "files", 3)
+    else:
+        print(f"  ✗ FAILED: backup command failed (rc={rc_21}) or dialog dir not found")
+
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # Test 22: --media downloads 94 photos + videos (84 photos + 10 videos)
+    test_name = "backup --media downloads 94 photos+videos with non-zero size"
+    print(f"\n[Test 22] {test_name}")
+
+    dialog_dir_22, _, rc_22 = _run_backup_with_flags("backup_media_dl", "--media", timeout_s=600)
+    checks_count = 4
+    passed_count = 0
+    if dialog_dir_22 and rc_22 == 0:
+        checks_count, passed_count = _check_download_category(dialog_dir_22, "media", 94)
+    else:
+        print(f"  ✗ FAILED: backup command failed (rc={rc_22}) or dialog dir not found")
+
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # Test 23: --music downloads 1 music file
+    test_name = "backup --music downloads 1 music file with non-zero size"
+    print(f"\n[Test 23] {test_name}")
+
+    dialog_dir_23, _, rc_23 = _run_backup_with_flags("backup_music_dl", "--music")
+    checks_count = 4
+    passed_count = 0
+    if dialog_dir_23 and rc_23 == 0:
+        checks_count, passed_count = _check_download_category(dialog_dir_23, "music", 1)
+    else:
+        print(f"  ✗ FAILED: backup command failed (rc={rc_23}) or dialog dir not found")
+
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # Test 24: --voice downloads 2 voice messages
+    test_name = "backup --voice downloads 2 voice messages with non-zero size"
+    print(f"\n[Test 24] {test_name}")
+
+    dialog_dir_24, _, rc_24 = _run_backup_with_flags("backup_voice_dl", "--voice")
+    checks_count = 4
+    passed_count = 0
+    if dialog_dir_24 and rc_24 == 0:
+        checks_count, passed_count = _check_download_category(dialog_dir_24, "voice", 2)
+    else:
+        print(f"  ✗ FAILED: backup command failed (rc={rc_24}) or dialog dir not found")
+
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # Test 25: --links creates links/ directory with 24 entries (no file downloads)
+    test_name = "backup --links creates links/ directory with 24 message entries"
+    print(f"\n[Test 25] {test_name}")
+
+    dialog_dir_25, _, rc_25 = _run_backup_with_flags("backup_links_dl", "--links")
+    checks_count = 2
+    passed_count = 0
+    if dialog_dir_25 and rc_25 == 0:
+        cat_dir_25 = os.path.join(dialog_dir_25, "links")
+        cat_json_25 = os.path.join(cat_dir_25, "messages.json")
+        for chk in [
+            check_directory_exists(cat_dir_25),
+            check_json_array_length(cat_json_25, 24),
+        ]:
+            r = chk()
+            if r.passed:
+                passed_count += 1
+                print(f"    ✓ {r.message}")
+            else:
+                print(f"  ✗ FAILED: {r.message}")
+    else:
+        print(f"  ✗ FAILED: backup command failed (rc={rc_25}) or dialog dir not found")
+
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
     return (total_tests, total_checks, total_passed)
 
 

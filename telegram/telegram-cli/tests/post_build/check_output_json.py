@@ -218,3 +218,103 @@ def check_file_exists(filepath: str) -> Callable[[], CheckResult]:
         return CheckResult(True, f"File exists: {filepath}")
     return _check
 
+
+def check_json_all_elements_have_key(filepath: str, key: str) -> Callable[[], CheckResult]:
+    """
+    Verify all elements in a JSON array have the specified key with a non-None value.
+
+    Args:
+        filepath: Path to the JSON file to check
+        key: The key that every element must have
+
+    Returns:
+        A function that returns CheckResult
+    """
+    def _check() -> CheckResult:
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            if not isinstance(data, list):
+                return CheckResult(False, f"File content is not a JSON array: {filepath}")
+
+            if not data:
+                return CheckResult(False, f"Array is empty: {filepath}")
+
+            missing_indices = [
+                i for i, el in enumerate(data)
+                if not (isinstance(el, dict) and key in el and el[key] is not None)
+            ]
+            if missing_indices:
+                return CheckResult(
+                    False,
+                    f"{len(missing_indices)}/{len(data)} elements missing key '{key}' in {filepath}"
+                )
+            return CheckResult(True, f"All {len(data)} elements have key '{key}'")
+        except FileNotFoundError:
+            return CheckResult(False, f"File not found: {filepath}")
+        except json.JSONDecodeError as e:
+            return CheckResult(False, f"Invalid JSON in {filepath}: {e}")
+        except Exception as e:
+            return CheckResult(False, f"Error reading {filepath}: {e}")
+    return _check
+
+
+def check_files_referenced_in_json_exist(
+    json_filepath: str,
+    files_dir: str,
+    key: str = "file_path",
+) -> Callable[[], CheckResult]:
+    """
+    Verify that all files referenced by a key in a JSON array exist with non-zero size.
+
+    Args:
+        json_filepath: Path to the JSON array file whose elements have a file reference
+        files_dir: Directory against which file_path values are resolved
+        key: The key holding the relative filename (default: "file_path")
+
+    Returns:
+        A function that returns CheckResult
+    """
+    def _check() -> CheckResult:
+        try:
+            with open(json_filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            if not isinstance(data, list):
+                return CheckResult(False, f"Not a JSON array: {json_filepath}")
+
+            referenced = [el[key] for el in data if isinstance(el, dict) and key in el and el[key]]
+            if not referenced:
+                return CheckResult(False, f"No elements with key '{key}' found in {json_filepath}")
+
+            missing = []
+            empty = []
+            for filename in referenced:
+                fp = os.path.join(files_dir, filename)
+                if not os.path.isfile(fp):
+                    missing.append(filename)
+                elif os.path.getsize(fp) == 0:
+                    empty.append(filename)
+
+            if missing:
+                return CheckResult(
+                    False,
+                    f"{len(missing)} referenced file(s) not found in {files_dir}: {missing[:3]}"
+                )
+            if empty:
+                return CheckResult(
+                    False,
+                    f"{len(empty)} referenced file(s) are empty (0 bytes): {empty[:3]}"
+                )
+            return CheckResult(
+                True, f"All {len(referenced)} referenced files exist with non-zero size"
+            )
+        except FileNotFoundError:
+            return CheckResult(False, f"File not found: {json_filepath}")
+        except json.JSONDecodeError as e:
+            return CheckResult(False, f"Invalid JSON in {json_filepath}: {e}")
+        except Exception as e:
+            return CheckResult(False, f"Error: {e}")
+    return _check
+

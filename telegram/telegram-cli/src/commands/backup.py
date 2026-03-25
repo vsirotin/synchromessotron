@@ -244,44 +244,27 @@ async def _async_get_dialog_name(client, dialog_id: int) -> str:
 
 
 def _get_media_category(media_type: str | None) -> str | None:
-    """Map Telethon media type to our subdirectory category.
-    
+    """Map semantic media type string to our subdirectory category.
+
+    Expects values produced by telegram_lib.messages._get_media_type:
+    "photo", "video", "audio", "voice", "gif", "document", "webpage".
+
     Returns:
         Category name ("media", "files", "music", "voice", "links", "gifs") or None.
     """
     if not media_type:
         return None
-    
-    media_type_lower = media_type.lower()
-    
-    # Photos and videos → media/
-    if any(x in media_type_lower for x in ["photo", "video"]):
-        return "media"
-    
-    # Audio files → check if music or voice
-    if "audio" in media_type_lower:
-        # Heuristic: if it has attributes suggesting music, classify as music
-        # Otherwise as voice for now (could be improved with metadata)
-        return "music"
-    
-    # Documents → files/
-    if any(x in media_type_lower for x in ["document", "file"]):
-        return "files"
-    
-    # Voice messages (specific type in Telethon)
-    if "voice" in media_type_lower:
-        return "voice"
-    
-    # Web page previews → links/
-    if any(x in media_type_lower for x in ["webpage", "webpage"]):
-        return "links"
-    
-    # Animated media (GIFs) → gifs/
-    if any(x in media_type_lower for x in ["animation", "gif", "animated"]):
-        return "gifs"
-    
-    # Fallback: treat unknown media types as "media"
-    return "media"
+
+    _MAP = {
+        "photo": "media",
+        "video": "media",
+        "audio": "music",
+        "voice": "voice",
+        "gif": "gifs",
+        "document": "files",
+        "webpage": "links",
+    }
+    return _MAP.get(media_type, "media")
 
 
 def _generate_messages_md(messages: list[dict]) -> str:
@@ -530,10 +513,7 @@ async def _async_backup(
             _progress_bar(pages, pages, new_to_fetch, new_to_fetch, elapsed, tty)
         
         # Download media files for messages that have media
-        # NOTE: Media downloads are currently disabled due to Telethon compatibility issues
-        # with certain message types ('Message' object errors). Once Telethon is updated,
-        # downloads can be re-enabled by setting ENABLE_MEDIA_DOWNLOADS = True
-        ENABLE_MEDIA_DOWNLOADS = False
+        ENABLE_MEDIA_DOWNLOADS = True
         file_paths = {}  # message_id -> relative_file_path mapping
         download_stats = {"attempted": 0, "success": 0, "failed": 0, "skipped": 0}
         if enabled_categories and ENABLE_MEDIA_DOWNLOADS:

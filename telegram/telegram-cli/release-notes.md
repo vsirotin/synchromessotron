@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.0.30
+Implemented media/file downloading for the backup command: (1) Enabled `ENABLE_MEDIA_DOWNLOADS = True` in `backup.py`; downloads are now active for all flag-selected categories (--media, --files, --music, --voice, --gifs); (2) Updated `_get_media_category()` to use semantic type strings ("photo", "video", "audio", "voice", "gif", "document", "webpage") from telegram-lib 1.2.8, replacing the previous Telethon class-name heuristic that failed to distinguish videos/audio/voice from plain documents; (3) Fixed root cause in telegram-lib 1.2.8: `_to_message_info()` now sets `media_type` to a semantic string by inspecting Telethon `DocumentAttribute*` objects; (4) Fixed download bug in telegram-lib 1.2.8: `download_media()` passed `ids=int` to `get_messages`, causing `'Message' object is not subscriptable` — fixed to `ids=[int]`; (5) Added 2 new check functions to integration test framework: `check_json_all_elements_have_key` and `check_files_referenced_in_json_exist`; (6) Added integration tests 21–25 (TDD): --files downloads 3 documents, --media downloads 94 photos+videos, --music downloads 1 audio file, --voice downloads 2 voice messages, --links creates 24-entry category dir with no file downloads; all 47 checks across 17 tests pass. All 115 unit tests pass.
+
 ## Version: 1.0.29
 Dependency update: telegram-lib bumped to 1.2.7 (ruff lint fixes in media.py and members.py — no functional change). All 115 unit tests pass.
 
