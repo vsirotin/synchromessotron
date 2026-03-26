@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.1.2
+Updated release.yml: added `build-user-manuals` job that converts all `*.md` files from `telegram/telegram-cli/manuals/` to PDF (via pandoc + weasyprint) into a `user_manuals/` directory, and includes the resulting PDF files as GitHub Release assets.
+
 ## Version: 1.1.1
 Created EN_User_Manual.md: full user manual restructured for non-IT users. Added Windows Quick Start, Setup Checklist, ToC, plain-English error descriptions, "How to open Command Prompt" box, Advanced section (split_threshold), Troubleshooting section. Simplified Output Directory section in main body.
 
