@@ -56,36 +56,47 @@ class IntegrationTestRunner:
     def get_cli_executable(self) -> str:
         """
         Get the appropriate CLI executable path for the current platform.
-        
+
+        Priority:
+          macOS   → telegram-cli (native binary), fallback to telegram-cli.pyz
+          Windows → telegram-cli.exe,             fallback to telegram-cli.pyz
+          Linux   → telegram-cli.pyz only
+
         Returns:
-            CLI path (e.g., "python3 dist/telegram-cli.pyz", "dist/telegram-cli", etc.)
-        
+            CLI invocation string (e.g., "dist/telegram-cli" or "python3 dist/telegram-cli.pyz")
+
         Raises:
             FileNotFoundError: If no executable found for current platform
         """
         platform_name = self.get_platform_name()
-        
-        # For all platforms, try .pyz first (most portable)
         pyz_path = self.dist_dir / "telegram-cli.pyz"
-        if pyz_path.exists():
-            return f"python3 {pyz_path}"
-        
-        # Platform-specific binaries as fallback
+
         if platform_name == "macos":
             macos_bin = self.dist_dir / "telegram-cli"
             if macos_bin.exists():
+                print(f"  Using native macOS binary: {macos_bin}")
                 return str(macos_bin)
-        
+            print(f"  Native macOS binary not found, falling back to .pyz")
+            if pyz_path.exists():
+                return f"python3 {pyz_path}"
+
         elif platform_name == "windows":
             windows_bin = self.dist_dir / "telegram-cli.exe"
             if windows_bin.exists():
+                print(f"  Using native Windows binary: {windows_bin}")
                 return str(windows_bin)
-        
-        # No executable found
+            print(f"  Native Windows binary not found, falling back to .pyz")
+            if pyz_path.exists():
+                return f"python3 {pyz_path}"
+
+        else:  # linux
+            if pyz_path.exists():
+                return f"python3 {pyz_path}"
+
         raise FileNotFoundError(
             f"No CLI executable found in {self.dist_dir}\n"
-            f"Expected one of: telegram-cli.pyz, telegram-cli (macOS), telegram-cli.exe (Windows)\n"
-            f"Build first with: bash tools/build_pyz.sh (or tools/build_macos.sh / tools/build_windows.sh)"
+            f"Expected one of: telegram-cli (macOS), telegram-cli.exe (Windows), telegram-cli.pyz\n"
+            f"Build first with: bash tools/build_macos.sh / build_windows.sh / build_pyz.sh"
         )
     
     def rebuild_if_requested(self, rebuild: bool) -> None:

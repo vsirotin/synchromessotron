@@ -31,7 +31,8 @@ Execute all unit tests in `telegram/telegram-cli/tests/unit/` via pytest.
 
 **Steps:**
 1. Navigate to `telegram/telegram-cli/`
-2. Run: `python3 -m pytest tests/unit/ -v`
+2. Run: `../telegram-lib/.venv/bin/python -m pytest tests/unit/ -v`
+   (This venv contains the current `telegram_lib` source. `python3` points to a system interpreter that lacks the package.)
 3. Collect test results (number of tests, passes, failures)
 4. Print summary
 

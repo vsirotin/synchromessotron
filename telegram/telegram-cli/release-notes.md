@@ -1,6 +1,9 @@
 # Project telegram/telegram-cli. Release notes 
 
 ## Version: 1.1.6
+Fixed integration test runner: native macOS/Windows binary is now tried first, .pyz used as fallback. Fixed unit test command in skill to use telegram-lib/.venv/bin/python (system python3 lacks telegram_lib).
+
+## Version: 1.1.6
 Added multi-language User Manual links table to README.md.
 
 ## Version: 1.1.5

@@ -281,10 +281,10 @@ After building the CLI executable:
 cd telegram/telegram-cli/dist
 
 # Automatic: detects platform, finds executable, runs tests
-python3 tests/post_build/run_integration_tests.py
+python3 ../tests/post_build/run_integration_tests.py
 
 # With rebuild (if you want to rebuild first)
-python3 tests/post_build/run_integration_tests.py --rebuild
+python3 ../tests/post_build/run_integration_tests.py --rebuild
 ```
 
 ### 6.2 How It Works

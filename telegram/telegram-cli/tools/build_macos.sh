@@ -41,7 +41,7 @@ cd "$LIB_DIR"
 cd "$PROJECT_DIR"
 
 echo "==> Installing telegram-lib from wheel..."
-"$PY" -m pip install --quiet --find-links dist/wheels telegram-lib
+"$PY" -m pip install --quiet --force-reinstall --find-links dist/wheels telegram-lib
 
 echo "==> Installing telegram-cli..."
 "$PY" -m pip install --quiet .
