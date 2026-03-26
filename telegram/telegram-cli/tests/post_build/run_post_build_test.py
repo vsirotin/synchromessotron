@@ -150,6 +150,57 @@ class PostBuildTestRunner:
             return False
     
     
+    def check_build_venv_imports(self) -> tuple[int, int]:
+        """
+        Verify that the build venv's telegram_lib exports all symbols required by the CLI.
+
+        PyInstaller freezes whatever is installed in dist/.build-venv at build time.
+        If a symbol is missing here it will be missing inside the native binary too,
+        but the bug will only surface when that sub-command is dispatched (lazy import),
+        so the `version` smoke-test cannot catch it.
+
+        Returns:
+            Tuple of (checks, passed)
+        """
+        build_venv = self.dist_dir / ".build-venv"
+        if not build_venv.exists():
+            # No build venv present (e.g. .pyz-only build) — skip silently
+            return 0, 0
+
+        # Symbols that commands.backup (and other modules) import from telegram_lib
+        required_symbols = [
+            "get_dialogs",
+            "download_media",
+            "get_members",
+        ]
+
+        # Prefer the venv's own python executable
+        venv_python = build_venv / "bin" / "python"
+        if not venv_python.exists():
+            venv_python = build_venv / "Scripts" / "python.exe"  # Windows
+        if not venv_python.exists():
+            return 0, 0
+
+        checks = len(required_symbols)
+        passed = 0
+        print(f"\n[Build-venv import check]")
+        for symbol in required_symbols:
+            code = f"from telegram_lib import {symbol}; print('OK')"
+            result = subprocess.run(
+                [str(venv_python), "-c", code],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                print(f"  ✓ telegram_lib.{symbol}")
+                passed += 1
+            else:
+                err = result.stderr.strip().splitlines()[-1] if result.stderr.strip() else "unknown error"
+                print(f"  ✗ telegram_lib.{symbol} — {err}")
+
+        return checks, passed
+
     def run_tests(self, cli: str, project_root: Path) -> tuple[int, int, int]:
         """
         Run post-build verification: execute `version` subcommand to verify executable works.
@@ -257,10 +308,16 @@ def main():
                     print(f"  Build failed. Cannot continue without platform binary.")
                     sys.exit(1)
         
-        # Run version check for each executable
         total_tests_all = 0
         total_checks_all = 0
         total_passed_all = 0
+
+        # Run build-venv import check (catches stale bundled telegram_lib)
+        import_checks, import_passed = runner.check_build_venv_imports()
+        total_checks_all += import_checks
+        total_passed_all += import_passed
+
+        # Run version check for each executable
         
         for exec_name, cli in executables:
             print(f"\n{'='*60}")
