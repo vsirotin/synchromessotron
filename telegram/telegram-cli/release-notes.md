@@ -1,5 +1,11 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.1.4
+Added user manual translations: DE_Bedienungsanleitung.md (German), TR_Kullanıcı_Kılavuzu.md (Turkish), AR_دليل_المستخدم.md (Arabic), RU_Руководство_Пользователя.md (Russian), FA_راهنمای_کاربر.md (Persian/Farsi).
+
+## Version: 1.1.3
+Added FA_راهنمای_کاربر.md: complete Persian (Farsi) translation of the user manual.
+
 ## Version: 1.1.2
 Added RU_Руководство_Пользователя.md: complete Russian translation of the user manual.
 
