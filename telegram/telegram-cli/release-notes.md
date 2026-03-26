@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.1.0. 
+Extension of command backup with --since/--upto time windows and --count, new README examples.
+
 ## Version: 1.0.34
 Optimized integration tests 21–25 and added README examples for `--estimate`, `--count`, `--since`, `--upto`, and `--split_threshold`. Tests 21 and 22 now use a Jan 2026 time window (`--since=2026-01-21T00:00:00+00:00 --upto=2026-01-20T23:59:59+00:00`): 159 messages, 3 docs, 44 media items (down from 94); test 22 timeout reduced from 600 s to 300 s. Tests 23–25 use a Feb 2026 window (`--since=2026-02-28T00:00:00+00:00 --upto=2026-02-27T23:59:59+00:00`): test 25 expected link count corrected from 24 to 17. README gains seven new examples demonstrating `--estimate`, `--count`, incremental (`--since`), historical snapshot (`--upto`), correct and deliberately wrong `--since+--upto` combinations, and `--split_threshold`.
 
