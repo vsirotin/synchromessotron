@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.1.1
+Created EN_User_Manual.md: full user manual restructured for non-IT users. Added Windows Quick Start, Setup Checklist, ToC, plain-English error descriptions, "How to open Command Prompt" box, Advanced section (split_threshold), Troubleshooting section. Simplified Output Directory section in main body.
+
 ## Version: 1.1.0. 
 Extension of command backup with --since/--upto time windows and --count, new README examples.
 
