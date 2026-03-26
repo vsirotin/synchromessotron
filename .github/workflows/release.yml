@@ -9,6 +9,7 @@
 #   - telegram-cli.pyz       (ubuntu — shiv)
 #   - telegram-cli.exe       (windows — PyInstaller)
 #   - telegram-cli-macos.zip (macos — PyInstaller)
+#   - user_manuals/*.pdf     (PDF versions of all manuals in telegram/telegram-cli/manuals/)
 #
 # Build logic lives in telegram/telegram-cli/tools/build_*.sh so the
 # same scripts can be used for local builds.
@@ -126,10 +127,44 @@ jobs:
           path: telegram/telegram-cli/dist/telegram-cli-macos.zip
 
   # -------------------------------------------------------------------
-  # 4. Create GitHub Release and upload all assets
+  # 4. User Manuals — convert .md files to .pdf and collect in user_manuals/
+  # -------------------------------------------------------------------
+  build-user-manuals:
+    needs: [quality-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pandoc and weasyprint
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y pandoc
+          pip install weasyprint
+
+      - name: Convert manuals to PDF
+        run: |
+          mkdir -p user_manuals
+          for f in telegram/telegram-cli/manuals/*.md; do
+            base=$(basename "$f" .md)
+            pandoc "$f" -o "user_manuals/${base}.pdf" --pdf-engine=weasyprint
+          done
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: telegram-cli-manuals
+          path: user_manuals/
+
+  # -------------------------------------------------------------------
+  # 5. Create GitHub Release and upload all assets
   # -------------------------------------------------------------------
   release:
-    needs: [build-pyz, build-windows, build-macos]
+    needs: [build-pyz, build-windows, build-macos, build-user-manuals]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -153,6 +188,8 @@ jobs:
         with:
           path: release-assets
           merge-multiple: true
+          # Downloads all artifacts: telegram-cli-pyz, telegram-cli-exe,
+          # telegram-cli-macos, and telegram-cli-manuals (PDFs)
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -161,6 +198,7 @@ jobs:
               release-assets/telegram-cli.pyz
               release-assets/telegram-cli.exe
               release-assets/telegram-cli-macos.zip
+              release-assets/*.pdf
             generate_release_notes: true
             draft: ${{ steps.check-tag.outputs.draft == 'true' }}
             prerelease: ${{ steps.check-tag.outputs.prerelease == 'true' }}
