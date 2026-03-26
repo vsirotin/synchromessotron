@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.1.6
+Added multi-language User Manual links table to README.md.
+
 ## Version: 1.1.5
 Updated release.yml: added `build-user-manuals` job that converts all `*.md` files from `telegram/telegram-cli/manuals/` to PDF (via pandoc + weasyprint) into a `user_manuals/` directory, and includes the resulting PDF files as GitHub Release assets.
 

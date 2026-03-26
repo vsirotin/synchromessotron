@@ -17,7 +17,14 @@ It is especially useful for **offline processing** of Telegram content — for e
 
 You do not need to be a programmer to use this tool. Just follow the steps below.
 
-For full documentation and usage instructions, see the [User Manual](manuals/EN_User_Manual.md).
+| Language | ISO 639‑1 | User Manual |
+|----------|-----------|-------------|
+| Russian | ru | [Руководство пользователя](manuals/RU_Руководство_Пользователя.md) |
+| English | en | [User Manual](manuals/EN_User_Manual.md) |
+| Persian (Farsi) | fa | [راهنمای کاربر](manuals/FA_راهنمای_کاربر.md) |
+| Turkish | tr | [Kullanıcı Kılavuzu](manuals/TR_Kullanıcı_Kılavuzu.md) |
+| Arabic | ar | [دليل المستخدم](manuals/AR_دليل_المستخدم.md) |
+| German | de | [Bedienungsanleitung](manuals/DE_Bedienungsanleitung.md) |
 
 
 ## For Developers
