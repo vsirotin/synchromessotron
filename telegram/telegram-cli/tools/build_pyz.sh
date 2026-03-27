@@ -34,6 +34,9 @@ cd "$LIB_DIR"
 "$PY" -m build --wheel --outdir "$PROJECT_DIR/dist/wheels" .
 cd "$PROJECT_DIR"
 
+echo "==> Installing telegram-lib from wheel into build venv..."
+"$PIP" install --quiet --force-reinstall --find-links dist/wheels telegram-lib
+
 echo "==> Building telegram-cli.pyz..."
 mkdir -p dist
 "$SHIV" -o dist/telegram-cli.pyz --find-links dist/wheels -e src.cli:main .

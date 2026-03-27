@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.2.4
+Fixed `build-pyz` CI failure: `build_pyz.sh` now installs `telegram_lib` into the build venv (matching `build_macos.sh`/`build_windows.sh`), so `check_build_venv_imports` passes. Also declared `src.help_texts` package data explicitly in `pyproject.toml` to ensure JSON files are bundled in the `.pyz`.
+
 ## Version: 1.2.3
 Updated all 6 language user manuals: added download instruction to Windows Quick Start "Before you begin" section; updated timestamp format examples (`--since`, `--upto`) to shorter forms.
 
