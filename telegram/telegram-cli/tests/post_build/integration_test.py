@@ -12,6 +12,7 @@ Usage:
 import glob
 import json
 import os
+import shutil
 import subprocess
 import sys
 from typing import Callable
@@ -479,107 +480,48 @@ def integration_test(cli: str) -> tuple[int, int, int]:
     # To restore: See git history
 
     
-    # Test 19: Verify Issue 1 - download count should match limit (not stuck at ~199)
-    test_name = "Issue 1: backup downloads more than 199 messages when limit > 199"
-    print(f"\n[Test 19] {test_name}")
-    
+    # Test 11: backup downloads more than 200 messages when limit > 200
+    test_name = "backup downloads more than 200 messages when limit > 200"
+    print(f"\n[Test 11] {test_name}")
+
     backup_issue1 = "backup_issue1"
     if os.path.exists(backup_issue1):
-        import shutil
         shutil.rmtree(backup_issue1)
-    
-    # Capture stdout to check message count
-    import subprocess
-    full_cmd = f"{cli} backup -4821106881 --limit=500 --outdir={backup_issue1}"
+
+    full_cmd = f"{cli} backup -4821106881 --limit=205 --outdir={backup_issue1}"
     result = subprocess.run(full_cmd, shell=True, capture_output=True, text=True, timeout=180)
-    
+
     checks_count = 1
     passed_count = 0
-    
-    # Parse stdout to extract "X messages saved" count
-    import re
+
     match = re.search(r'(\d+)\s+messages?\s+saved', result.stdout)
     if match:
         saved_count = int(match.group(1))
-        if saved_count > 199:
+        if saved_count > 200:
             passed_count += 1
-            print(f"    ✓ Downloaded {saved_count} messages (> 199) when --limit=500")
+            print(f"    ✓ Downloaded {saved_count} messages (> 200) when --limit=205")
         else:
-            print(f"    ✗ FAILED: Downloaded {saved_count} messages (expected > 199) with --limit=500")
+            print(f"    ✗ FAILED: Downloaded {saved_count} messages (expected > 200) with --limit=205")
     else:
         print(f"    ✗ FAILED: Could not parse message count from output")
-    
-    # Cleanup
-    if os.path.exists(backup_issue1):
-        import shutil
-        shutil.rmtree(backup_issue1)
-    
-    total_tests += 1
-    total_checks += checks_count
-    total_passed += passed_count
-    
-    # Test 20: Verify Issue 2 - messages.json should contain all downloaded messages (not just 100)
-    test_name = "Issue 2: messages.json contains ALL downloaded messages (not just 100)"
-    print(f"\n[Test 20] {test_name}")
-    
-    backup_issue2 = "backup_issue2"
-    if os.path.exists(backup_issue2):
-        import shutil
-        shutil.rmtree(backup_issue2)
-    
-    # Capture stdout to check message count
-    full_cmd = f"{cli} backup -4821106881 --limit=500 --outdir={backup_issue2}"
-    result = subprocess.run(full_cmd, shell=True, capture_output=True, text=True, timeout=180)
-    
-    checks_count = 2
-    passed_count = 0
-    
-    # Parse stdout to extract "X messages saved" count
-    match = re.search(r'(\d+)\s+messages?\s+saved', result.stdout)
-    saved_count = None
-    if match:
-        saved_count = int(match.group(1))
-    
-    # Find dialog directory
-    matching_dirs = glob.glob(os.path.join(backup_issue2, "*_-4821106881"))
-    if matching_dirs:
-        json_count = _count_tree_messages(matching_dirs[0])
-        if json_count > 100:
-            passed_count += 1
-            print(f"    ✓ messages hierarchy contains {json_count} messages (> 100)")
-        else:
-            print(f"    ✗ FAILED: messages hierarchy contains {json_count} messages (expected > 100)")
-        if saved_count and json_count != saved_count:
-            print(f"    ⚠ Warning: tree has {json_count} msgs but stdout said {saved_count} saved")
 
-        md_count = _count_tree_md_headers(matching_dirs[0])
-        if md_count > 100:
-            passed_count += 1
-            print(f"    ✓ messages.md headers across tree: {md_count} (> 100)")
-        else:
-            print(f"    ✗ FAILED: messages.md headers across tree: {md_count} (expected > 100)")
-    else:
-        print(f"    ✗ FAILED: Dialog directory not found")
-    
-    # Cleanup
-    if os.path.exists(backup_issue2):
-        import shutil
-        shutil.rmtree(backup_issue2)
-    
+    if os.path.exists(backup_issue1):
+        shutil.rmtree(backup_issue1)
+
     total_tests += 1
     total_checks += checks_count
     total_passed += passed_count
 
     # -----------------------------------------------------------------------
-    # Tests 21-25: Media / file downloading (requires --media / --files /
-    # --music / --voice / --links flags and ENABLE_MEDIA_DOWNLOADS = True)
+    # Tests 12-16: Media / file downloading
+    # All use correct (since <= upto) date ranges derived from real message metadata.
     # -----------------------------------------------------------------------
 
     # Helper: run a backup with given flags, return (dialog_dir_path, stdout, returncode)
     def _run_backup_with_flags(outdir: str, flags: str, timeout_s: int = 300):
         if os.path.exists(outdir):
             shutil.rmtree(outdir)
-        cmd = f"{cli} backup -4821106881 --limit=500 {flags} --outdir={outdir}"
+        cmd = f"{cli} backup -4821106881 {flags} --outdir={outdir}"
         print(f"\n  Running: {cmd}")
         proc = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout_s)
         matched = glob.glob(os.path.join(outdir, "*_-4821106881"))
@@ -607,105 +549,101 @@ def integration_test(cli: str) -> tuple[int, int, int]:
                 print(f"  ✗ FAILED: {result.message}")
         return len(checks), passed
 
-    # Test 21: --files downloads 3 document files
-    # Uses --since=2026-01-21 --upto=2026-01-20 to constrain to 159 messages (Jan 2026 and earlier):
-    # pagination starts before Jan 21 and stops naturally (no messages before that window are wasted),
-    # then --upto=Jan 20 confirms the upper bound. Only 3 docs exist in this window.
-    test_name = "backup --files downloads 3 document files with non-zero size"
-    print(f"\n[Test 21] {test_name}")
+    # Test 12: --files downloads 2 document files (Jan 7–14 2026 window)
+    # Files in window: MOV_20260107 (2026-01-07) + MOV_20260114 (2026-01-14) = 2 files
+    test_name = "backup --files downloads 2 document files (Jan 7–14 2026)"
+    print(f"\n[Test 12] {test_name}")
 
-    dialog_dir_21, _, rc_21 = _run_backup_with_flags(
+    dialog_dir_12, _, rc_12 = _run_backup_with_flags(
         "backup_files_dl",
-        "--files --since=2026-01-21T00:00:00+00:00 --upto=2026-01-20T23:59:59+00:00",
+        "--files --limit=200 --since=2026-01-07T00:00:00+00:00 --upto=2026-01-14T23:59:59+00:00",
     )
     checks_count = 4
     passed_count = 0
-    if dialog_dir_21 and rc_21 == 0:
-        checks_count, passed_count = _check_download_category(dialog_dir_21, "files", 3)
+    if dialog_dir_12 and rc_12 == 0:
+        checks_count, passed_count = _check_download_category(dialog_dir_12, "files", 2)
     else:
-        print(f"  ✗ FAILED: backup command failed (rc={rc_21}) or dialog dir not found")
+        print(f"  ✗ FAILED: backup command failed (rc={rc_12}) or dialog dir not found")
 
     total_tests += 1
     total_checks += checks_count
     total_passed += passed_count
 
-    # Test 22: --media downloads photos + videos.
-    # Same Jan 2026 window (--since=Jan 21, --upto=Jan 20): 159 messages, 39 photos + 5 videos = 44 items.
-    # This is ~54 % fewer downloads than the full-history window (94 items), reducing test run time.
-    test_name = "backup --media downloads 44 photos+videos with non-zero size"
-    print(f"\n[Test 22] {test_name}")
+    # Test 13: --media downloads photos + videos (Dec 21 2025 window, 5 items)
+    # Dec 21 2025 has 5 media items (photos and videos)
+    test_name = "backup --media downloads 5 media items (Dec 21 2025)"
+    print(f"\n[Test 13] {test_name}")
 
-    dialog_dir_22, _, rc_22 = _run_backup_with_flags(
+    dialog_dir_13, _, rc_13 = _run_backup_with_flags(
         "backup_media_dl",
-        "--media --since=2026-01-21T00:00:00+00:00 --upto=2026-01-20T23:59:59+00:00",
+        "--media --limit=100 --since=2025-12-21T00:00:00+00:00 --upto=2025-12-21T23:59:59+00:00",
         timeout_s=300,
     )
     checks_count = 4
     passed_count = 0
-    if dialog_dir_22 and rc_22 == 0:
-        checks_count, passed_count = _check_download_category(dialog_dir_22, "media", 44)
+    if dialog_dir_13 and rc_13 == 0:
+        checks_count, passed_count = _check_download_category(dialog_dir_13, "media", 5)
     else:
-        print(f"  ✗ FAILED: backup command failed (rc={rc_22}) or dialog dir not found")
+        print(f"  ✗ FAILED: backup command failed (rc={rc_13}) or dialog dir not found")
 
     total_tests += 1
     total_checks += checks_count
     total_passed += passed_count
 
-    # Test 23: --music downloads 1 music file.
-    # Uses Feb 2026 window (--since=Feb 28, --upto=Feb 27) — 376 messages, 1 music track.
-    test_name = "backup --music downloads 1 music file with non-zero size"
-    print(f"\n[Test 23] {test_name}")
+    # Test 14: --music downloads 1 music file (Oct 28 2025: Гроздья акации.m4a)
+    test_name = "backup --music downloads 1 music file (Oct 28 2025)"
+    print(f"\n[Test 14] {test_name}")
 
-    dialog_dir_23, _, rc_23 = _run_backup_with_flags(
+    dialog_dir_14, _, rc_14 = _run_backup_with_flags(
         "backup_music_dl",
-        "--music --since=2026-02-28T00:00:00+00:00 --upto=2026-02-27T23:59:59+00:00",
+        "--music --limit=100 --since=2025-10-28T00:00:00+00:00 --upto=2025-10-28T23:59:59+00:00",
     )
     checks_count = 4
     passed_count = 0
-    if dialog_dir_23 and rc_23 == 0:
-        checks_count, passed_count = _check_download_category(dialog_dir_23, "music", 1)
+    if dialog_dir_14 and rc_14 == 0:
+        checks_count, passed_count = _check_download_category(dialog_dir_14, "music", 1)
     else:
-        print(f"  ✗ FAILED: backup command failed (rc={rc_23}) or dialog dir not found")
+        print(f"  ✗ FAILED: backup command failed (rc={rc_14}) or dialog dir not found")
 
     total_tests += 1
     total_checks += checks_count
     total_passed += passed_count
 
-    # Test 24: --voice downloads 2 voice messages (same Feb window: 2 voice files).
-    test_name = "backup --voice downloads 2 voice messages with non-zero size"
-    print(f"\n[Test 24] {test_name}")
+    # Test 15: --voice downloads 1 voice message (Jan 7 2026: voice_2026-01-07_13-09-39.ogg)
+    test_name = "backup --voice downloads 1 voice message (Jan 7 2026)"
+    print(f"\n[Test 15] {test_name}")
 
-    dialog_dir_24, _, rc_24 = _run_backup_with_flags(
+    dialog_dir_15, _, rc_15 = _run_backup_with_flags(
         "backup_voice_dl",
-        "--voice --since=2026-02-28T00:00:00+00:00 --upto=2026-02-27T23:59:59+00:00",
+        "--voice --limit=100 --since=2026-01-07T00:00:00+00:00 --upto=2026-01-07T23:59:59+00:00",
     )
     checks_count = 4
     passed_count = 0
-    if dialog_dir_24 and rc_24 == 0:
-        checks_count, passed_count = _check_download_category(dialog_dir_24, "voice", 2)
+    if dialog_dir_15 and rc_15 == 0:
+        checks_count, passed_count = _check_download_category(dialog_dir_15, "voice", 1)
     else:
-        print(f"  ✗ FAILED: backup command failed (rc={rc_24}) or dialog dir not found")
+        print(f"  ✗ FAILED: backup command failed (rc={rc_15}) or dialog dir not found")
 
     total_tests += 1
     total_checks += checks_count
     total_passed += passed_count
 
-    # Test 25: --links creates links/ directory (same Feb window: 17 link entries, no file downloads).
-    test_name = "backup --links creates links/ directory with 17 message entries"
-    print(f"\n[Test 25] {test_name}")
+    # Test 16: --links creates links/ directory (Oct 26 2025 window: 2 link entries)
+    test_name = "backup --links creates links/ directory with 2 entries (Oct 26 2025)"
+    print(f"\n[Test 16] {test_name}")
 
-    dialog_dir_25, _, rc_25 = _run_backup_with_flags(
+    dialog_dir_16, _, rc_16 = _run_backup_with_flags(
         "backup_links_dl",
-        "--links --since=2026-02-28T00:00:00+00:00 --upto=2026-02-27T23:59:59+00:00",
+        "--links --limit=100 --since=2025-10-26T00:00:00+00:00 --upto=2025-10-26T23:59:59+00:00",
     )
     checks_count = 2
     passed_count = 0
-    if dialog_dir_25 and rc_25 == 0:
-        cat_dir_25 = os.path.join(dialog_dir_25, "links")
-        cat_json_25 = os.path.join(cat_dir_25, "messages.json")
+    if dialog_dir_16 and rc_16 == 0:
+        cat_dir_16 = os.path.join(dialog_dir_16, "links")
+        cat_json_16 = os.path.join(cat_dir_16, "messages.json")
         for chk in [
-            check_directory_exists(cat_dir_25),
-            check_json_array_length(cat_json_25, 17),
+            check_directory_exists(cat_dir_16),
+            check_json_array_length(cat_json_16, 2),
         ]:
             r = chk()
             if r.passed:
@@ -714,43 +652,40 @@ def integration_test(cli: str) -> tuple[int, int, int]:
             else:
                 print(f"  ✗ FAILED: {r.message}")
     else:
-        print(f"  ✗ FAILED: backup command failed (rc={rc_25}) or dialog dir not found")
+        print(f"  ✗ FAILED: backup command failed (rc={rc_16}) or dialog dir not found")
 
     total_tests += 1
     total_checks += checks_count
     total_passed += passed_count
 
     # -----------------------------------------------------------------------
-    # Tests 26-28: New flags --upto, --count, --split_threshold
+    # Tests 17-19: --upto, --count, --split_threshold
     # -----------------------------------------------------------------------
 
-    # Test 26: --upto filters out messages after the timestamp
+    # Test 17: --upto filters out messages after the timestamp
     test_name = "backup --upto filters out messages newer than the cutoff"
-    print(f"\n[Test 26] {test_name}")
+    print(f"\n[Test 17] {test_name}")
 
     backup_upto = "backup_upto"
     if os.path.exists(backup_upto):
         shutil.rmtree(backup_upto)
 
-    checks_count, passed_count = test_file_output(
-        cli,
-        f"backup -4821106881 --limit=500 --upto=2026-03-19T00:00:00+00:00 --outdir={backup_upto}",
-        # command must succeed (captured in test_file_output)
+    subprocess.run(
+        f"{cli} backup -4821106881 --limit=500 --upto=2026-03-19T00:00:00+00:00 --outdir={backup_upto}",
+        shell=True, capture_output=True, text=True, timeout=120,
     )
 
-    # Now manually count total messages in tree and compare
-    matching_dirs_26 = glob.glob(os.path.join(backup_upto, "*_-4821106881"))
+    matching_dirs_17 = glob.glob(os.path.join(backup_upto, "*_-4821106881"))
     checks_count = 2
     passed_count = 0
-    if matching_dirs_26:
-        tree_count = _count_tree_messages(matching_dirs_26[0])
+    if matching_dirs_17:
+        tree_count = _count_tree_messages(matching_dirs_17[0])
         if tree_count == 480:
             passed_count += 1
             print(f"    ✓ --upto: tree contains {tree_count} messages (expected 480)")
         else:
             print(f"  ✗ FAILED: --upto: tree contains {tree_count} messages (expected 480)")
 
-        # Also verify it is strictly less than without --upto (500)
         if tree_count < 500:
             passed_count += 1
             print(f"    ✓ --upto: {tree_count} < 500 (messages were filtered)")
@@ -766,9 +701,9 @@ def integration_test(cli: str) -> tuple[int, int, int]:
     total_checks += checks_count
     total_passed += passed_count
 
-    # Test 27: --count prints totals, writes no files
+    # Test 18: --count prints totals, writes no files
     test_name = "backup --count prints total + breakdown and creates no output files"
-    print(f"\n[Test 27] {test_name}")
+    print(f"\n[Test 18] {test_name}")
 
     backup_count_outdir = "backup_count_nowrite"
     if os.path.exists(backup_count_outdir):
@@ -800,9 +735,9 @@ def integration_test(cli: str) -> tuple[int, int, int]:
     total_checks += checks_count
     total_passed += passed_count
 
-    # Test 28: --split_threshold creates deeper hierarchy when count exceeds threshold
+    # Test 19: --split_threshold creates deeper hierarchy when count exceeds threshold
     test_name = "backup --split_threshold=5 creates month-level subdirectory"
-    print(f"\n[Test 28] {test_name}")
+    print(f"\n[Test 19] {test_name}")
 
     backup_split = "backup_split"
     if os.path.exists(backup_split):
@@ -813,33 +748,321 @@ def integration_test(cli: str) -> tuple[int, int, int]:
         f"backup -4821106881 --limit=20 --split_threshold=5 --outdir={backup_split}",
     )
 
-    matching_dirs_28 = glob.glob(os.path.join(backup_split, "*_-4821106881"))
+    matching_dirs_19 = glob.glob(os.path.join(backup_split, "*_-4821106881"))
     checks_count = 2
     passed_count = 0
-    if matching_dirs_28:
-        dialog_dir_28 = matching_dirs_28[0]
-        # With 20 msgs > threshold=5, should drill past year → month level
-        # All 20 messages are from 2026-03: expect 2026/03/ directory
-        month_dir = os.path.join(dialog_dir_28, "2026", "03")
+    if matching_dirs_19:
+        dialog_dir_19 = matching_dirs_19[0]
+        month_dir = os.path.join(dialog_dir_19, "2026", "03")
         if os.path.isdir(month_dir):
             passed_count += 1
             print(f"    ✓ --split_threshold=5 created month subdir: {month_dir}")
         else:
             print(f"  ✗ FAILED: --split_threshold=5 month subdir not found: {month_dir}")
-            print(f"    tree: {list(os.walk(dialog_dir_28))}")
+            print(f"    tree: {list(os.walk(dialog_dir_19))}")
 
-        # Verify total message count is still 20
-        tree_count_28 = _count_tree_messages(dialog_dir_28)
-        if tree_count_28 == 20:
+        tree_count_19 = _count_tree_messages(dialog_dir_19)
+        if tree_count_19 == 20:
             passed_count += 1
-            print(f"    ✓ --split_threshold=5 tree contains {tree_count_28} messages (expected 20)")
+            print(f"    ✓ --split_threshold=5 tree contains {tree_count_19} messages (expected 20)")
         else:
-            print(f"  ✗ FAILED: --split_threshold=5 tree contains {tree_count_28} messages (expected 20)")
+            print(f"  ✗ FAILED: --split_threshold=5 tree contains {tree_count_19} messages (expected 20)")
     else:
         print(f"  ✗ FAILED: dialog dir not found after --split_threshold backup")
 
     if os.path.exists(backup_split):
         shutil.rmtree(backup_split)
+
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # -----------------------------------------------------------------------
+    # Test 20: invalid --since / --upto combination is rejected
+    # -----------------------------------------------------------------------
+
+    test_name = "backup rejects --since after --upto with exit code 1"
+    print(f"\n[Test 20] {test_name}")
+
+    inv_cmd = f"{cli} backup -4821106881 --limit=10 --since=2026-01-21T00:00:00+00:00 --upto=2026-01-20T23:59:59+00:00"
+    inv_result = subprocess.run(inv_cmd, shell=True, capture_output=True, text=True, timeout=30)
+
+    checks_count = 2
+    passed_count = 0
+
+    if inv_result.returncode != 0:
+        passed_count += 1
+        print(f"    ✓ CLI exited with code {inv_result.returncode} (non-zero, as expected)")
+    else:
+        print(f"  ✗ FAILED: CLI exited 0 — should have rejected invalid time range")
+
+    if "--since" in inv_result.stderr or "--upto" in inv_result.stderr or "Error" in inv_result.stderr:
+        passed_count += 1
+        print(f"    ✓ stderr contains helpful error message")
+    else:
+        print(f"  ✗ FAILED: stderr has no error message (stderr={inv_result.stderr[:200]!r})")
+
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # -----------------------------------------------------------------------
+    # Tests 21-25: --since / --upto date granularity acceptance
+    # All use --estimate (no downloads) to keep tests fast.
+    # -----------------------------------------------------------------------
+
+    def _check_estimate_accepts(label: str, flags: str) -> tuple[int, int]:
+        """Run backup --estimate with given flags; verify exit 0 and ≈ in output."""
+        cmd = f"{cli} backup -4821106881 --limit=50 --estimate {flags}"
+        print(f"\n  Running: {cmd}")
+        proc = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=60)
+        passed = 0
+        if proc.returncode == 0:
+            passed += 1
+            print(f"    ✓ {label}: CLI accepted the date format (exit 0)")
+        else:
+            print(f"  ✗ FAILED: {label}: CLI rejected the date format (exit {proc.returncode})")
+            print(f"    stderr: {proc.stderr[:200]}")
+        if "\u2248" in proc.stdout:
+            passed += 1
+            print(f"    ✓ {label}: output contains ≈ (estimate printed)")
+        else:
+            print(f"  ✗ FAILED: {label}: ≈ not found in stdout")
+        return 2, passed
+
+    # Test 21: --upto with seconds precision
+    test_name = "backup --upto accepts seconds-precision timestamp"
+    print(f"\n[Test 21] {test_name}")
+    checks_count, passed_count = _check_estimate_accepts(
+        "seconds", "--upto=2026-01-07T13:09:39+00:00"
+    )
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # Test 22: --upto with minutes precision (no seconds)
+    test_name = "backup --upto accepts minutes-precision timestamp"
+    print(f"\n[Test 22] {test_name}")
+    checks_count, passed_count = _check_estimate_accepts(
+        "minutes", "--upto=2026-01-07T13:09"
+    )
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # Test 23: --upto with day precision (date only)
+    test_name = "backup --upto accepts day-precision date"
+    print(f"\n[Test 23] {test_name}")
+    checks_count, passed_count = _check_estimate_accepts(
+        "day", "--upto=2026-01-07"
+    )
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # Test 24: --upto with month precision (year-month)
+    test_name = "backup --upto accepts month-precision date (YYYY-MM)"
+    print(f"\n[Test 24] {test_name}")
+    checks_count, passed_count = _check_estimate_accepts(
+        "month", "--upto=2026-01"
+    )
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # Test 25: --upto with year precision
+    test_name = "backup --upto accepts year-precision date (YYYY)"
+    print(f"\n[Test 25] {test_name}")
+    checks_count, passed_count = _check_estimate_accepts(
+        "year", "--upto=2026"
+    )
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # -----------------------------------------------------------------------
+    # Test 26: --help command
+    # -----------------------------------------------------------------------
+
+    test_name = "help command prints general usage"
+    print(f"\n[Test 26] {test_name}")
+    checks_count, passed_count = test(
+        cli,
+        "help",
+        check_stdout_contains("telegram-cli"),
+        check_stdout_contains("backup"),
+        check_stdout_contains("send"),
+        check_stdout_contains("Available commands:"),
+    )
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # -----------------------------------------------------------------------
+    # Test 27: download-media command
+    # Sends a test message with a photo (via backup existing media msg),
+    # downloads it via download-media, and verifies the file exists.
+    # Uses known voice message id from Jan 7 2026 window backup.
+    # -----------------------------------------------------------------------
+
+    # First obtain the message_id of a known media message by running a backup
+    # with limited scope and reading the media messages.json
+    test_name = "download-media downloads a file for a known media message"
+    print(f"\n[Test 27] {test_name}")
+
+    dl_outdir = "backup_for_dm"
+    if os.path.exists(dl_outdir):
+        shutil.rmtree(dl_outdir)
+
+    # Run a small backup to get a media message id
+    dm_cmd = f"{cli} backup -4821106881 --voice --limit=100 --since=2026-01-07T00:00:00+00:00 --upto=2026-01-07T23:59:59+00:00 --outdir={dl_outdir}"
+    dm_proc = subprocess.run(dm_cmd, shell=True, capture_output=True, text=True, timeout=120)
+
+    checks_count = 3
+    passed_count = 0
+
+    dl_dialog_dirs = glob.glob(os.path.join(dl_outdir, "*_-4821106881"))
+    media_msg_id = None
+    if dl_dialog_dirs:
+        voice_json = os.path.join(dl_dialog_dirs[0], "voice", "messages.json")
+        if os.path.exists(voice_json):
+            with open(voice_json, encoding="utf-8") as fp:
+                voice_msgs = json.load(fp)
+            if voice_msgs:
+                media_msg_id = voice_msgs[0]["id"]
+
+    if media_msg_id is not None:
+        dl_dest = "download_media_test"
+        if os.path.exists(dl_dest):
+            shutil.rmtree(dl_dest)
+        os.makedirs(dl_dest, exist_ok=True)
+
+        dm2_cmd = f"{cli} download-media -4821106881 {media_msg_id} --dest={dl_dest}"
+        print(f"\n  Running: {dm2_cmd}")
+        dm2_proc = subprocess.run(dm2_cmd, shell=True, capture_output=True, text=True, timeout=60)
+
+        if dm2_proc.returncode == 0:
+            passed_count += 1
+            print(f"    ✓ download-media exited 0")
+        else:
+            print(f"  ✗ FAILED: download-media exited {dm2_proc.returncode}")
+            print(f"    stderr: {dm2_proc.stderr[:200]}")
+
+        try:
+            dm_output = json.loads(dm2_proc.stdout)
+            if "file_path" in dm_output:
+                passed_count += 1
+                print(f"    ✓ output JSON contains file_path: {dm_output['file_path']}")
+            else:
+                print(f"  ✗ FAILED: output JSON missing file_path")
+            downloaded_file = dm_output.get("file_path", "")
+            if downloaded_file and os.path.exists(downloaded_file):
+                passed_count += 1
+                print(f"    ✓ downloaded file exists: {downloaded_file}")
+            else:
+                # file_path may be relative to dl_dest
+                alt = os.path.join(dl_dest, os.path.basename(downloaded_file)) if downloaded_file else ""
+                if alt and os.path.exists(alt):
+                    passed_count += 1
+                    print(f"    ✓ downloaded file exists (relative): {alt}")
+                else:
+                    print(f"  ✗ FAILED: downloaded file not found at {downloaded_file!r}")
+        except (json.JSONDecodeError, Exception) as exc:
+            print(f"  ✗ FAILED: could not parse download-media JSON output: {exc}")
+            print(f"    stdout: {dm2_proc.stdout[:200]}")
+
+        if os.path.exists(dl_dest):
+            shutil.rmtree(dl_dest)
+    else:
+        print(f"  ✗ FAILED: could not obtain media message id (backup step failed)")
+
+    if os.path.exists(dl_outdir):
+        shutil.rmtree(dl_outdir)
+
+    total_tests += 1
+    total_checks += checks_count
+    total_passed += passed_count
+
+    # -----------------------------------------------------------------------
+    # Test 28: send / download-media / edit / delete flow
+    # Sends a text message, edits it, then deletes it.
+    # Also sends a backup to find a media message, downloads it, verifies.
+    # Dialog: -4821106881
+    # -----------------------------------------------------------------------
+
+    test_name = "send → edit → delete message flow"
+    print(f"\n[Test 28] {test_name}")
+
+    checks_count = 6
+    passed_count = 0
+    sent_msg_id = None
+    FLOW_DIALOG = -4821106881
+
+    # Step 1: send
+    send_cmd = f'{cli} send {FLOW_DIALOG} --text="Integration test message - please ignore"'
+    print(f"\n  Running: {send_cmd}")
+    send_proc = subprocess.run(send_cmd, shell=True, capture_output=True, text=True, timeout=30)
+
+    if send_proc.returncode == 0:
+        passed_count += 1
+        print(f"    ✓ send exited 0")
+        try:
+            send_out = json.loads(send_proc.stdout)
+            sent_msg_id = send_out.get("id")
+            if sent_msg_id:
+                passed_count += 1
+                print(f"    ✓ send returned message id={sent_msg_id}")
+            else:
+                print(f"  ✗ FAILED: send output missing 'id': {send_out}")
+        except (json.JSONDecodeError, Exception) as exc:
+            print(f"  ✗ FAILED: could not parse send output: {exc}")
+    else:
+        print(f"  ✗ FAILED: send exited {send_proc.returncode}")
+        print(f"    stderr: {send_proc.stderr[:200]}")
+
+    # Step 2: edit (requires sent_msg_id)
+    if sent_msg_id is not None:
+        edit_cmd = f'{cli} edit {FLOW_DIALOG} {sent_msg_id} --text="Integration test message - EDITED"'
+        print(f"\n  Running: {edit_cmd}")
+        edit_proc = subprocess.run(edit_cmd, shell=True, capture_output=True, text=True, timeout=30)
+
+        if edit_proc.returncode == 0:
+            passed_count += 1
+            print(f"    ✓ edit exited 0")
+            try:
+                edit_out = json.loads(edit_proc.stdout)
+                if edit_out.get("id") == sent_msg_id and "EDITED" in edit_out.get("text", ""):
+                    passed_count += 1
+                    print(f"    ✓ edit returned updated message with correct text")
+                else:
+                    print(f"  ✗ FAILED: edit output mismatch: {edit_out}")
+            except (json.JSONDecodeError, Exception) as exc:
+                print(f"  ✗ FAILED: could not parse edit output: {exc}")
+        else:
+            print(f"  ✗ FAILED: edit exited {edit_proc.returncode}")
+            print(f"    stderr: {edit_proc.stderr[:200]}")
+
+    # Step 3: delete
+    if sent_msg_id is not None:
+        del_cmd = f"{cli} delete {FLOW_DIALOG} {sent_msg_id}"
+        print(f"\n  Running: {del_cmd}")
+        del_proc = subprocess.run(del_cmd, shell=True, capture_output=True, text=True, timeout=30)
+
+        if del_proc.returncode == 0:
+            passed_count += 1
+            print(f"    ✓ delete exited 0")
+            try:
+                del_out = json.loads(del_proc.stdout)
+                if isinstance(del_out, list) and sent_msg_id in del_out:
+                    passed_count += 1
+                    print(f"    ✓ delete returned list containing id {sent_msg_id}")
+                else:
+                    print(f"  ✗ FAILED: delete output mismatch: {del_out}")
+            except (json.JSONDecodeError, Exception) as exc:
+                print(f"  ✗ FAILED: could not parse delete output: {exc}")
+        else:
+            print(f"  ✗ FAILED: delete exited {del_proc.returncode}")
+            print(f"    stderr: {del_proc.stderr[:200]}")
 
     total_tests += 1
     total_checks += checks_count

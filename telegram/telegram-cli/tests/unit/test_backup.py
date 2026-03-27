@@ -814,3 +814,170 @@ class TestScanExistingInTree:
         ids = _scan_existing_in_tree(tmp_path)
         assert 42 in ids
 
+
+# ---------------------------------------------------------------------------
+# Date parsing tests (_parse_partial_datetime, _parse_since, _parse_upto)
+# ---------------------------------------------------------------------------
+
+
+class TestParseSince:
+
+    def test_parse_since_none(self):
+        """None input returns None."""
+        from src.commands.backup import _parse_since
+        assert _parse_since(None) is None
+
+    def test_parse_since_full_datetime_with_tz(self):
+        """Full ISO datetime with timezone is parsed correctly."""
+        from src.commands.backup import _parse_since
+        dt = _parse_since("2026-01-07T13:09:39+00:00")
+        assert dt == datetime(2026, 1, 7, 13, 9, 39, tzinfo=timezone.utc)
+
+    def test_parse_since_full_datetime_without_tz(self):
+        """Full datetime without timezone gets UTC added."""
+        from src.commands.backup import _parse_since
+        dt = _parse_since("2026-03-27T12:00:00")
+        assert dt.tzinfo == timezone.utc
+        assert dt.year == 2026 and dt.month == 3 and dt.day == 27
+
+    def test_parse_since_minutes_precision(self):
+        """Datetime ending at minutes (no seconds) is parsed."""
+        from src.commands.backup import _parse_since
+        dt = _parse_since("2026-03-27T12:00")
+        assert dt.year == 2026 and dt.month == 3 and dt.day == 27
+        assert dt.hour == 12 and dt.minute == 0
+
+    def test_parse_since_day_precision(self):
+        """Date-only string is parsed as midnight UTC."""
+        from src.commands.backup import _parse_since
+        dt = _parse_since("2026-01-07")
+        assert dt == datetime(2026, 1, 7, 0, 0, 0, tzinfo=timezone.utc)
+
+    def test_parse_since_month_precision(self):
+        """Year-month string is parsed as first day of month midnight UTC."""
+        from src.commands.backup import _parse_since
+        dt = _parse_since("2026-03")
+        assert dt == datetime(2026, 3, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+    def test_parse_since_year_precision(self):
+        """Year-only string is parsed as Jan 1 midnight UTC."""
+        from src.commands.backup import _parse_since
+        dt = _parse_since("2026")
+        assert dt == datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+    def test_parse_since_invalid_exits(self, capsys):
+        """Completely invalid string exits with code 1."""
+        from src.commands.backup import _parse_since
+        with pytest.raises(SystemExit) as exc_info:
+            _parse_since("not-a-date")
+        assert exc_info.value.code == 1
+        assert "Invalid --since" in capsys.readouterr().err
+
+
+class TestParseUpto:
+
+    def test_parse_upto_none(self):
+        """None input returns None."""
+        from src.commands.backup import _parse_upto
+        assert _parse_upto(None) is None
+
+    def test_parse_upto_full_datetime(self):
+        """Full ISO datetime is parsed correctly."""
+        from src.commands.backup import _parse_upto
+        dt = _parse_upto("2026-01-07T23:59:59+00:00")
+        assert dt == datetime(2026, 1, 7, 23, 59, 59, tzinfo=timezone.utc)
+
+    def test_parse_upto_day_precision(self):
+        """Date-only is parsed as midnight UTC."""
+        from src.commands.backup import _parse_upto
+        dt = _parse_upto("2026-01-07")
+        assert dt == datetime(2026, 1, 7, 0, 0, 0, tzinfo=timezone.utc)
+
+    def test_parse_upto_month_precision(self):
+        """Year-month string is parsed as first day midnight UTC."""
+        from src.commands.backup import _parse_upto
+        dt = _parse_upto("2025-10")
+        assert dt == datetime(2025, 10, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+    def test_parse_upto_year_precision(self):
+        """Year-only is parsed as Jan 1 midnight UTC."""
+        from src.commands.backup import _parse_upto
+        dt = _parse_upto("2025")
+        assert dt == datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+    def test_parse_upto_invalid_exits(self, capsys):
+        """Completely invalid string exits with code 1."""
+        from src.commands.backup import _parse_upto
+        with pytest.raises(SystemExit) as exc_info:
+            _parse_upto("bad-input")
+        assert exc_info.value.code == 1
+        assert "Invalid --upto" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# Time range validation (_validate_time_range)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateTimeRange:
+
+    def test_validate_time_range_since_after_upto_exits(self, capsys):
+        """since > upto exits with code 1 and prints an error."""
+        from src.commands.backup import _validate_time_range
+        since = datetime(2026, 1, 21, tzinfo=timezone.utc)
+        upto = datetime(2026, 1, 20, tzinfo=timezone.utc)
+        with pytest.raises(SystemExit) as exc_info:
+            _validate_time_range(since, upto)
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "--since" in err
+        assert "--upto" in err
+
+    def test_validate_time_range_since_equals_upto_ok(self):
+        """since == upto is accepted (single-instant window)."""
+        from src.commands.backup import _validate_time_range
+        dt = datetime(2026, 1, 7, tzinfo=timezone.utc)
+        # Should not raise
+        _validate_time_range(dt, dt)
+
+    def test_validate_time_range_since_before_upto_ok(self):
+        """since < upto is the normal valid case — no error."""
+        from src.commands.backup import _validate_time_range
+        since = datetime(2026, 1, 7, tzinfo=timezone.utc)
+        upto = datetime(2026, 1, 20, tzinfo=timezone.utc)
+        _validate_time_range(since, upto)  # no exception
+
+    def test_validate_time_range_only_since_ok(self):
+        """Only --since (no --upto) is valid."""
+        from src.commands.backup import _validate_time_range
+        since = datetime(2026, 1, 21, tzinfo=timezone.utc)
+        _validate_time_range(since, None)
+
+    def test_validate_time_range_only_upto_ok(self):
+        """Only --upto (no --since) is valid."""
+        from src.commands.backup import _validate_time_range
+        upto = datetime(2026, 1, 20, tzinfo=timezone.utc)
+        _validate_time_range(None, upto)
+
+    def test_validate_time_range_neither_ok(self):
+        """No --since and no --upto is valid."""
+        from src.commands.backup import _validate_time_range
+        _validate_time_range(None, None)
+
+    def test_run_backup_rejects_since_after_upto(self, capsys):
+        """run_backup exits 1 when --since is after --upto."""
+        with (
+            patch("src.commands.backup.load_config", return_value={
+                "api_id": 1, "api_hash": "a", "session": "s"
+            }),
+        ):
+            from src.commands.backup import run_backup
+            with pytest.raises(SystemExit) as exc_info:
+                run_backup(
+                    dialog_id=100,
+                    since="2026-01-21T00:00:00+00:00",
+                    upto="2026-01-20T23:59:59+00:00",
+                )
+        assert exc_info.value.code == 1
+        assert "--since" in capsys.readouterr().err
+

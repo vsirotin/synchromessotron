@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.2.0
+Extended test suite: date range validation (`--since`/`--upto`), date-precision acceptance tests (seconds/minutes/day/month/year), send/edit/delete flow, download-media, and `help` integration tests. Added `_validate_time_range` to reject `since > upto`. Fixed media-download test windows to correct (since ≤ upto) narrow ranges. Renumbered integration tests 1–28.
+
 ## Version: 1.1.6
 Added telegram_lib import check to run_post_build_test.py: verifies get_dialogs, download_media, get_members are all importable from build venv before release. Catches stale bundled telegram_lib that `version` smoke-test cannot detect.
 

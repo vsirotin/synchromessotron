@@ -328,6 +328,7 @@ def run_backup(
     """Main entry point for the backup command."""
     since_dt = _parse_since(since)
     upto_dt = _parse_upto(upto)
+    _validate_time_range(since_dt, upto_dt)
 
     if estimate:
         _run_estimate(dialog_id, since_dt, limit)
@@ -460,8 +461,15 @@ async def _async_backup(
         _progress_local_scan(len(existing_ids), latest_local, new_to_fetch)
         _progress_estimate(new_to_fetch, pages)
 
-        # Resume point: use latest_local as since if we have existing data
-        resume_since = latest_local if (existing_ids and latest_local) else since_dt
+        # Resume point:
+        # • When a date range is specified (both since and upto), start pagination
+        #   from just after upto so Telethon returns messages going backwards
+        #   toward since.  since_dt is then applied as a lower-bound post-filter.
+        # • Otherwise, use latest_local (incremental resume) or since_dt as cursor.
+        if upto_dt is not None and since_dt is not None:
+            resume_since = upto_dt
+        else:
+            resume_since = latest_local if (existing_ids and latest_local) else since_dt
 
         # T19 — pagination loop
         all_messages = []
@@ -527,9 +535,12 @@ async def _async_backup(
 
         elapsed = time.monotonic() - start_time
 
-        # Apply --upto filter: discard messages after the upper timestamp bound
+        # Apply date range filters
         if upto_dt is not None:
             all_messages = [m for m in all_messages if m.date <= upto_dt]
+        if since_dt is not None and upto_dt is not None:
+            # Range mode: also apply lower bound
+            all_messages = [m for m in all_messages if m.date >= since_dt]
 
         # Show final progress bar at 100% completion
         if tty:
@@ -618,31 +629,64 @@ async def _async_backup(
 # ---------------------------------------------------------------------------
 
 
+def _parse_partial_datetime(value: str) -> datetime:
+    """Parse full or partial ISO 8601 date/time strings.
+
+    Accepted formats (most to least precise):
+        2026-03-27T12:00:00+00:00  — full datetime with timezone
+        2026-03-27T12:00:00        — full datetime without timezone (UTC assumed)
+        2026-03-27T12:00           — minutes precision
+        2026-03-27                 — day precision  → midnight UTC
+        2026-03                    — month precision → first day of month, midnight UTC
+        2026                       — year precision  → Jan 1 of year, midnight UTC
+
+    Raises ValueError for anything else.
+    """
+    import re as _re
+    # year-only: "2026"
+    if _re.fullmatch(r'\d{4}', value):
+        return datetime(int(value), 1, 1, tzinfo=timezone.utc)
+    # year-month: "2026-03"
+    if _re.fullmatch(r'\d{4}-\d{2}', value):
+        y, m = value.split('-')
+        return datetime(int(y), int(m), 1, tzinfo=timezone.utc)
+    # everything else: delegate to fromisoformat
+    dt = datetime.fromisoformat(value)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 def _parse_since(since: str | None) -> datetime | None:
-    """Parse ISO 8601 string to datetime or return None."""
+    """Parse ISO 8601 string (full or partial) to datetime or return None."""
     if since is None:
         return None
     try:
-        dt = datetime.fromisoformat(since)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
+        return _parse_partial_datetime(since)
     except ValueError:
-        print(f"Error: Invalid --since timestamp: {since}", file=sys.stderr)
+        print(f"Error: Invalid --since timestamp: {since!r}", file=sys.stderr)
         sys.exit(1)
 
 
 def _parse_upto(upto: str | None) -> datetime | None:
-    """Parse ISO 8601 string for --upto to datetime or return None."""
+    """Parse ISO 8601 string (full or partial) for --upto to datetime or return None."""
     if upto is None:
         return None
     try:
-        dt = datetime.fromisoformat(upto)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
+        return _parse_partial_datetime(upto)
     except ValueError:
-        print(f"Error: Invalid --upto timestamp: {upto}", file=sys.stderr)
+        print(f"Error: Invalid --upto timestamp: {upto!r}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _validate_time_range(since_dt: datetime | None, upto_dt: datetime | None) -> None:
+    """Exit with error if --since is strictly after --upto (impossible range)."""
+    if since_dt is not None and upto_dt is not None and since_dt > upto_dt:
+        print(
+            f"Error: --since ({since_dt.isoformat()}) must not be after "
+            f"--upto ({upto_dt.isoformat()})",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
 
@@ -850,7 +894,7 @@ def _write_messages_hierarchically(
 
 
 async def _async_count_messages(client, dialog_id, since_dt, upto_dt, limit):
-    """Connect, paginate messages (metadata only), apply upto filter, return list."""
+    """Connect, paginate messages (metadata only), apply date filters, return list."""
     async with client:
         count_result = await count_messages(client, dialog_id, since=since_dt)
         if not count_result.ok:
@@ -861,7 +905,11 @@ async def _async_count_messages(client, dialog_id, since_dt, upto_dt, limit):
 
         all_msgs = []
         remaining = effective
-        resume_since = since_dt
+        # When a range is given (both since and upto) start from upto going backward
+        if upto_dt is not None and since_dt is not None:
+            resume_since = upto_dt
+        else:
+            resume_since = since_dt
 
         while remaining > 0:
             page_limit = min(PAGE_SIZE, remaining)
@@ -874,7 +922,11 @@ async def _async_count_messages(client, dialog_id, since_dt, upto_dt, limit):
             page = r.payload
             if not page:
                 break
-            filtered = page if upto_dt is None else [m for m in page if m.date <= upto_dt]
+            filtered = page
+            if upto_dt is not None:
+                filtered = [m for m in filtered if m.date <= upto_dt]
+            if since_dt is not None and upto_dt is not None:
+                filtered = [m for m in filtered if m.date >= since_dt]
             all_msgs.extend(filtered)
             remaining -= len(page)
             if page:
