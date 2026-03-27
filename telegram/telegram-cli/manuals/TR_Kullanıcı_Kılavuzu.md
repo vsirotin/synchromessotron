@@ -44,7 +44,7 @@ Bu aracı kullanmak için programcı olmanıza gerek yoktur. Sadece aşağıdaki
 
 Sıfırdan ilk yedeğinize ulaşmak için gereken beş komut aşağıdadır. Her komut bu kılavuzun ilerleyen bölümlerinde ayrıntılı olarak açıklanmaktadır.
 
-**Başlamadan önce:** `telegram-cli.exe` dosyasını istediğiniz bir klasöre koyun — örneğin `C:\Users\AdınızSoyadınız\telegram-cli\`. Komut İstemi'ni o klasörde açın (bkz. [Komut İstemi nasıl açılır](#komut-istemi-nasıl-açılır-windows-veya-terminal-macos) aşağıda).
+**Başlamadan önce:** `telegram-cli.exe` dosyasını ve bu kullanıcı kılavuzunu [Nasıl Kurulur](#nasıl-kurulur) bölümünde açıklandığı gibi indirin. Ardından `telegram-cli.exe` dosyasını istediğiniz bir klasöre koyun — örneğin `C:\Users\AdınızSoyadınız\telegram-cli\`. Komut İstemi'ni o klasörde açın (bkz. [Komut İstemi nasıl açılır](#komut-istemi-nasıl-açılır-windows-veya-terminal-macos) aşağıda).
 
 **Adım 1 — API kimlik bilgilerinizi alın:** <https://my.telegram.org/apps> adresinden (tek seferlik işlem, ayrıntılar için bkz. [Adım 2](#adım-2--bir-telegram-uygulaması-oluşturun)).
 
@@ -453,7 +453,7 @@ backup <dialog_id> [--since=TIMESTAMP] [--upto=TIMESTAMP] [--limit=N] [--outdir=
 **Artımlı yedekleme** — yalnızca bir tarihten sonraki mesajlar:
 
 ```
-telegram-cli backup -1001234567890 --since=2026-03-01T00:00:00+00:00
+telegram-cli backup -1001234567890 --since=2026-03-01
 ```
 
 **Beklenen sonuç:**
@@ -466,8 +466,8 @@ telegram-cli backup -1001234567890 --since=2026-03-01T00:00:00+00:00
 
 ```
 telegram-cli backup -1001234567890 ^
-    --since=2026-01-01T00:00:00+00:00 ^
-    --upto=2026-01-31T23:59:59+00:00
+    --since=2026-01-01T00 ^
+    --upto=2026-01-01T10
 ```
 
 > **Yaygın hata:** `--since` değerinin `--upto`'dan *sonra* bir tarihe ayarlanması 0 mesaj kaydedilmesiyle sonuçlanır; çünkü hiçbir mesaj hem Şubat'tan sonra hem de Ocak'tan önce olamaz. Her zaman `--since` değerinin `--upto`'dan daha eski bir tarih olduğunu kontrol edin.

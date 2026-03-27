@@ -44,7 +44,7 @@ You do not need to be a programmer to use this tool. Just follow the steps below
 
 Here are the five commands you need to go from zero to your first backup. Each command is explained in detail later in this manual.
 
-**Before you begin:** Place `telegram-cli.exe` in a folder of your choice — for example, `C:\Users\YourName\telegram-cli\`. Open Command Prompt in that folder (see [How to open Command Prompt](#how-to-open-command-prompt-windows-or-terminal-macos) below).
+**Before you begin:** Download `telegram-cli.exe` and this user manual as described in [How to Install](#how-to-install). Then place `telegram-cli.exe` in a folder of your choice — for example, `C:\Users\YourName\telegram-cli\`. Open Command Prompt in that folder (see [How to open Command Prompt](#how-to-open-command-prompt-windows-or-terminal-macos) below).
 
 **Step 1 — Get your API credentials** from <https://my.telegram.org/apps> (one-time, see [Step 2](#step-2--create-a-telegram-application) for details).
 
@@ -453,7 +453,7 @@ backup <dialog_id> [--since=TIMESTAMP] [--upto=TIMESTAMP] [--limit=N] [--outdir=
 **Incremental backup** — only messages after a date:
 
 ```
-telegram-cli backup -1001234567890 --since=2026-03-01T00:00:00+00:00
+telegram-cli backup -1001234567890 --since=2026-03-01
 ```
 
 **Expected result:**
@@ -466,8 +466,8 @@ telegram-cli backup -1001234567890 --since=2026-03-01T00:00:00+00:00
 
 ```
 telegram-cli backup -1001234567890 ^
-    --since=2026-01-01T00:00:00+00:00 ^
-    --upto=2026-01-31T23:59:59+00:00
+    --since=2026-01-01T00 ^
+    --upto=2026-01-01T10
 ```
 
 > **Common mistake:** Setting `--since` to a date *after* `--upto` results in 0 messages saved, because no message can be both after February and before January. Always check that `--since` is an earlier date than `--upto`.

@@ -1,5 +1,11 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.2.3
+Updated all 6 language user manuals: added download instruction to Windows Quick Start "Before you begin" section; updated timestamp format examples (`--since`, `--upto`) to shorter forms.
+
+## Version: 1.2.2
+Added platform-specific CLI tests: `tests/post_build/macos_test/macos_test.sh` and `tests/post_build/windows_test/windows_test.bat`. Both scripts call the native binary directly without Python, run 6 scenarios (version, get-dialogs to file, backup February 2026 with all media types, help, download-media, send/edit/delete), report PASS/FAIL with line counts, and exit non-zero on failure. Message ID extraction in the Windows script uses PowerShell `ConvertFrom-Json`. README files added to each subdirectory.
+
 ## Version: 1.2.1
 Fixed `help` command in built artifacts: added `src/help_texts/__init__.py` to make the JSON directory a proper package; declared `help_texts/*.json` in `pyproject.toml` package-data; updated `.spec` datas to bundle `src/help_texts` in the PyInstaller binary; updated `help_cmd.py` to resolve path from `sys._MEIPASS` when frozen and use `importlib.resources` otherwise. Fixed `NameError: name 're' is not defined` in `integration_test.py`. Updated SKILL.md: moved artifact build step before integration tests; corrected integration test runner script reference to `run_integration_tests.py`.
 

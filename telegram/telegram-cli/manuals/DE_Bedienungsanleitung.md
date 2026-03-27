@@ -44,7 +44,7 @@ Sie müssen kein Programmierer sein, um dieses Werkzeug zu verwenden. Folgen Sie
 
 Hier sind die fünf Befehle, die Sie benötigen, um Ihre erste Sicherung durchzuführen. Jeder Befehl wird weiter unten in dieser Anleitung ausführlich erklärt.
 
-**Bevor Sie beginnen:** Legen Sie `telegram-cli.exe` in einen Ordner Ihrer Wahl — zum Beispiel `C:\Users\IhrName\telegram-cli\`. Öffnen Sie die Eingabeaufforderung in diesem Ordner (siehe [Eingabeaufforderung öffnen](#eingabeaufforderung-öffnen-windows-oder-terminal-macos) weiter unten).
+**Bevor Sie beginnen:** Laden Sie `telegram-cli.exe` und dieses Benutzerhandbuch wie in [Installation](#installation) beschrieben herunter. Legen Sie dann `telegram-cli.exe` in einen Ordner Ihrer Wahl — zum Beispiel `C:\Users\IhrName\telegram-cli\`. Öffnen Sie die Eingabeaufforderung in diesem Ordner (siehe [Eingabeaufforderung öffnen](#eingabeaufforderung-öffnen-windows-oder-terminal-macos) weiter unten).
 
 **Schritt 1 — API-Zugangsdaten holen** von <https://my.telegram.org/apps> (einmalig, siehe [Schritt 2](#schritt-2--telegram-anwendung-erstellen) für Details).
 
@@ -453,7 +453,7 @@ backup <dialog_id> [--since=TIMESTAMP] [--upto=TIMESTAMP] [--limit=N] [--outdir=
 **Inkrementelle Sicherung** — nur Nachrichten ab einem bestimmten Datum:
 
 ```
-telegram-cli backup -1001234567890 --since=2026-03-01T00:00:00+00:00
+telegram-cli backup -1001234567890 --since=2026-03-01
 ```
 
 **Erwartetes Ergebnis:**
@@ -466,8 +466,8 @@ telegram-cli backup -1001234567890 --since=2026-03-01T00:00:00+00:00
 
 ```
 telegram-cli backup -1001234567890 ^
-    --since=2026-01-01T00:00:00+00:00 ^
-    --upto=2026-01-31T23:59:59+00:00
+    --since=2026-01-01T00 ^
+    --upto=2026-01-01T10
 ```
 
 > **Häufiger Fehler:** Wenn `--since` auf ein Datum *nach* `--upto` gesetzt wird, werden 0 Nachrichten gespeichert, da keine Nachricht gleichzeitig nach Februar und vor Januar liegen kann. Überprüfen Sie immer, dass `--since` ein früheres Datum als `--upto` ist.
