@@ -1,5 +1,8 @@
 # Project telegram/telegram-cli. Release notes 
 
+## Version: 1.2.1
+Fixed `help` command in built artifacts: added `src/help_texts/__init__.py` to make the JSON directory a proper package; declared `help_texts/*.json` in `pyproject.toml` package-data; updated `.spec` datas to bundle `src/help_texts` in the PyInstaller binary; updated `help_cmd.py` to resolve path from `sys._MEIPASS` when frozen and use `importlib.resources` otherwise. Fixed `NameError: name 're' is not defined` in `integration_test.py`. Updated SKILL.md: moved artifact build step before integration tests; corrected integration test runner script reference to `run_integration_tests.py`.
+
 ## Version: 1.2.0
 Extended test suite: date range validation (`--since`/`--upto`), date-precision acceptance tests (seconds/minutes/day/month/year), send/edit/delete flow, download-media, and `help` integration tests. Added `_validate_time_range` to reject `since > upto`. Fixed media-download test windows to correct (since ≤ upto) narrow ranges. Renumbered integration tests 1–28.
 

@@ -23,7 +23,7 @@ where = ["."]
 include = ["src*"]
 
 [tool.setuptools.package-data]
-"src" = ["version.yaml"]
+"src" = ["version.yaml", "help_texts/*.json"]
 
 [project.optional-dependencies]
 dev = [

@@ -13,6 +13,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(PROJECT_DIR / 'src' / 'version.yaml'), 'src'),
+        (str(PROJECT_DIR / 'src' / 'help_texts'), 'src/help_texts'),
         (str(LIB_DIR / 'telegram_lib' / 'version.yaml'), 'telegram_lib'),
     ],
     hiddenimports=['telegram_lib'],

@@ -42,28 +42,7 @@ Execute all unit tests in `telegram/telegram-cli/tests/unit/` via pytest.
 
 ---
 
-## 3. Run Integration Tests (Post-Build Verification)
-
-Integration tests run against the **real built artifact** using real Telegram credentials.
-
-**Location of config and artifact:** `telegram/telegram-cli/dist/`  
-— `config.yaml` with real API credentials lives here.  
-— The built `.pyz` (or binary) lives here.
-
-**Steps:**
-1. Navigate to `telegram/telegram-cli/dist/`
-2. Run: `python3 ../tests/post_build/run_post_build_test.py`
-3. Collect results
-
-**Behavior:**
-- **On success:** Proceed to section 4
-- **On failure:** Print verification results, continue anyway (do not stop this skill)
-
-**Rationale:** Integration tests hit the live Telegram API. `config.yaml` must be present in `dist/` before running them. These tests are also executed in CI/CD during `release.yml`.
-
----
-
-## 4. Building Platform Artifacts
+## 3. Building Platform Artifacts
 
 Build scripts are located in `telegram/telegram-cli/tools/`.
 
@@ -90,9 +69,30 @@ All artifacts land in `telegram/telegram-cli/dist/`.
 
 ---
 
+## 4. Run Integration Tests (Post-Build Verification)
+
+Integration tests run against the **real built artifact** using real Telegram credentials.
+
+**Location of config and artifact:** `telegram/telegram-cli/dist/`  
+— `config.yaml` with real API credentials lives here.  
+— The built `.pyz` (or binary) lives here.
+
+**Steps:**
+1. Navigate to `telegram/telegram-cli/dist/`
+2. Run: `python3 ../tests/post_build/run_integration_tests.py`
+3. Collect results
+
+**Behavior:**
+- **On success:** Proceed to section 5
+- **On failure:** Print verification results, continue anyway (do not stop this skill)
+
+**Rationale:** Integration tests hit the live Telegram API. `config.yaml` must be present in `dist/` before running them. These tests are also executed in CI/CD during `release.yml`.
+
+---
+
 ## 5. Pre-Release Verification Summary (BLOCKING GATE)
 
-Before version bump and release notes, collect and report results of sections 2 and 3.
+Before version bump and release notes, collect and report results of sections 2 and 4.
 
 **Output format:**
 

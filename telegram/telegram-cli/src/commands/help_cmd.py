@@ -7,6 +7,7 @@ when the requested language is unavailable or empty.
 
 from __future__ import annotations
 
+import importlib.resources
 import json
 import logging
 import sys
@@ -15,11 +16,35 @@ from pathlib import Path
 logger = logging.getLogger("telegram_cli")
 
 SUPPORTED_LANGS = ("en", "ru", "fa", "tr", "ar", "de")
-_HELP_DIR = Path(__file__).resolve().parent.parent / "help_texts"
+# Resolve the help_texts directory at import time so it works in all environments:
+#   - PyInstaller one-file binary: sys._MEIPASS points to the extracted bundle
+#   - Normal install / editable install: relative to this file
+import sys as _sys
+if hasattr(_sys, "_MEIPASS"):
+    _HELP_DIR = Path(_sys._MEIPASS) / "src" / "help_texts"
+else:
+    _HELP_DIR = Path(__file__).resolve().parent.parent / "help_texts"
 
 
 def _load_help(lang: str) -> dict:
-    """Load help JSON for *lang*, falling back to English."""
+    """Load help JSON for *lang*, falling back to English.
+
+    Uses importlib.resources so the JSON files are accessible inside a .pyz
+    zip archive or a PyInstaller binary — both of which freeze __file__.
+    """
+    # Try importlib.resources first (works inside .pyz / frozen binaries)
+    try:
+        pkg = importlib.resources.files("src.help_texts")
+        text = (pkg / f"{lang}.json").read_text(encoding="utf-8")
+        data = json.loads(text)
+        if not data and lang != "en":
+            print(f"Notice: Language '{lang}' not yet translated, showing English.", file=sys.stderr)
+            return _load_help("en")
+        return data
+    except (FileNotFoundError, ModuleNotFoundError):
+        pass
+
+    # Fallback: filesystem path (editable installs, development)
     path = _HELP_DIR / f"{lang}.json"
     if not path.is_file():
         if lang != "en":

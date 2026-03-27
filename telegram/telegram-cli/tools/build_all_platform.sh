@@ -5,8 +5,8 @@
 #
 # Usage (from any directory):
 #   bash telegram/telegram-cli/tools/build_all_platform.sh
-#   # or from inside telegram/telegram-cli/:
-#   bash tools/build_all_platform.sh
+#   # or from inside telegram/telegram-cli/dist/:
+#   bash ../tools/build_all_platform.sh
 #
 # The script will:
 #   1. Build the Python archive (.pyz) — works on any OS
