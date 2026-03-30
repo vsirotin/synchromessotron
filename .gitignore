@@ -66,3 +66,4 @@ telegram/telegram-cli/tests/post_build/run_integration_tests.py
 telegram/telegram-cli/tests/post_build/integration_test.py
 telegram/telegram-cli/tests/post_build/windows_test/windows_test.bat
 telegram/telegram-cli/tests/post_build/macos_test/macos_test.sh
+.github/hooks/log-prompts.json
